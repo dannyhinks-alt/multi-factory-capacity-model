@@ -5,6 +5,7 @@ import { checkIntegrity } from '../engine/integrity';
 import { autoMatchUnmapped, computeNextActions, type NextAction } from '../engine/nextactions';
 import { useHub } from '../store/HubContext';
 import { Badge, Button } from './ui';
+import { exportNormalised, useDataQuality } from './DataQuality';
 
 const TONE = { critical: 'critical', warning: 'warning', info: 'info' } as const;
 const BAR = { critical: '#d03b3b', warning: '#fab219', info: '#2a78d6' } as const;
@@ -14,16 +15,21 @@ const BAR = { critical: '#d03b3b', warning: '#fab219', info: '#2a78d6' } as cons
  * Audit, Fixed Process Drift and Logic Integrity engines, with jump buttons and 1-click fixes.
  */
 export function NextActionsStrip({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { state, model, update } = useHub();
+  const { state, model, update, notify } = useHub();
+  const dqMap = useDataQuality();
   const [all, setAll] = useState(false);
-  const [msg, setMsg] = useState('');
   const actions = useMemo(() => computeNextActions(state, model, reconcile(state), checkIntegrity(state, model)), [state, model]);
   const shown = all ? actions : actions.slice(0, 4);
   const fix = (a: NextAction) => {
+    if (a.quickFix === 'export-normalised') {
+      exportNormalised(state, dqMap, a.cellIds ?? []);
+      notify(`Exported ${a.cellIds?.length ?? 0} normalised Cell Design Passport(s) for the cell owners`, 'good');
+      return;
+    }
     if (a.quickFix !== 'auto-match') return;
     const r = autoMatchUnmapped(state);
     update(() => r.state, 'Auto-Match unmapped BOM nodes');
-    setMsg(`Auto-Matched ${r.mapped.map((m) => `${m.bomPartId} → ${m.cellId}/${m.routeId}`).join(', ') || 'nothing'}${r.remaining.length ? ` · still unmapped: ${r.remaining.join(', ')} (map in the BOM ↔ Cell Route Linker)` : ''}`);
+    notify(`Auto-Matched ${r.mapped.map((m) => `${m.bomPartId} → ${m.cellId}/${m.routeId}`).join(', ') || 'nothing'}${r.remaining.length ? ` · still unmapped: ${r.remaining.join(', ')} (map in the BOM ↔ Cell Route Linker)` : ''}`, r.mapped.length ? 'good' : 'warning');
   };
   if (!actions.length) {
     return <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-xs text-green-900">✓ Guided Next Actions: nothing outstanding — every link, drift and gate is clean.</div>;
@@ -50,12 +56,12 @@ export function NextActionsStrip({ navigate }: { navigate: (t: NavTarget) => voi
             </div>
             <div className="mt-2 flex flex-wrap justify-end gap-1.5">
               {a.quickFix && <Button variant="primary" onClick={() => fix(a)}>⚡ {a.quickFixLabel}</Button>}
+              {a.secondary && <Button variant="ghost" onClick={() => navigate({ ws: a.secondary!.view, tab: a.secondary!.tab })}>{a.secondary.label}</Button>}
               <Button onClick={() => navigate({ ws: a.view, tab: a.tab, cellId: a.cellId })}>Open →</Button>
             </div>
           </div>
         ))}
       </div>
-      {msg && <div className="mt-2 text-[11px] text-slate-700">{msg}</div>}
     </section>
   );
 }

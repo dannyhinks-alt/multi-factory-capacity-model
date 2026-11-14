@@ -11,7 +11,7 @@ The whole application builds to a single self-contained file, `dist-offline/inde
 ```bash
 npm ci
 npm run dev             # http://localhost:5173
-npm test                # 149 unit tests (Vitest)
+npm test                # 163 unit tests (Vitest)
 npm run build:offline   # → dist-offline/index.html (single file, zero external CDNs)
 npm run samples         # regenerate example input files under samples/
 ```
@@ -290,6 +290,57 @@ One click compiles every **approved** working-design drift into the pack:
 
 It exports as `.xlsx` (5 sheets), as `.csv`, or as a print-ready HTML sign-off pack. *Issue & lock next revision* feeds the pack back through the revision diff, so the approved drifts fall back into alignment. Every export is audited as `ECR pack issued`.
 
+## V1.5: Alias Dictionary & "Needs Data Action" feedback loop
+
+**Alias Dictionary.** `state.aliases` maps incoming nicknames to canonical IDs. It is edited in *Phase 2 → Assets & Workforce Skills → Alias Dictionary*, persisted in IndexedDB and included in Full-Plant JSON backups. It covers four domains:
+
+| Domain | Example |
+|---|---|
+| Cell IDs | `Cell_A` → `CELL-A` |
+| BOM Part / Variant IDs | `ATL100` → `ATL-100` |
+| Master Asset IDs | `DMU-50-1` → `CELL-A-VMC5-01` |
+| Master Tooling / Fixture IDs | `FIX-ATL-01` → `FX-ATL-100-DM-W-01` |
+
+The baseline ships with 7 aliases.
+
+**Alias-aware ingestion** (`src/engine/aliases.ts`). Cell Passport drops and Smart Import check every incoming ID, then apply the official IDs:
+- **What is checked:** the cell ID, route Variant IDs, asset IDs, and tooling IDs, including those referenced by individual ops.
+- **How it resolves:** an exact match first, then the Alias Dictionary.
+- **What counts as a near-duplicate:**
+  - **Normalised:** differs only in case or punctuation, e.g. `Cell_A` ≈ `CELL-A`.
+  - **Typo:** up to 2 insertions, deletions or transpositions, e.g. `CEL-D` ≈ `CELL-D`.
+  - **Not a typo:** pure substitutions, so sibling IDs such as `CELL-A` and `CELL-B`, or a genuinely new `CELL-M`, stay distinct.
+- **0 mismatches:** the passport is ingested silently.
+- **Any mismatch:** the preview lists each unrecognised ID or typo, where it appears and a suggested official ID. Click **Map & Remember Alias**, or *Keep as new* for genuinely new assets or tooling.
+- **Provenance:** the aliases a passport relied on are recorded in its `ingestNotes`.
+- **Safety:** without the preview, a typo such as `CEL-D` would have created a duplicate cell.
+
+**Data Quality Score and "Needs Data Action".** Each cell scores 100 minus deductions:
+
+| Issue | Deduction |
+|---|---|
+| Each alias relied on at ingestion | −5 |
+| Fuzzy or manual BOM link | −5 |
+| Asset or tooling missing from the catalogue | −10 |
+| Op uses a machine the passport doesn't list | −10 |
+| Asset with no service loads or no footprint | −5 each |
+| OEE falling back to the Complexity default | −3 |
+| Skill missing from the catalogue | −5 |
+| Role missing from the catalogue | −3 |
+
+Any "fix at source" item, or a score below 90%, flags the cell **Needs Data Action**. Each flagged cell gets a plain-English punch-list. The flags appear in:
+- **Guided Next Actions:** with a quick fix to export all flagged passports.
+- **Phase 2 · Cell Passports:** the Data Quality table.
+- **Phase 3 · Cells & Macro-Routing:** a badge on the cell row and a card in the cell detail.
+
+**⬇ Export Normalised Passport (.json).** Available per cell or in bulk for every flagged cell. It writes a clean Cell Design Passport with official IDs applied and hub-only provenance removed. A `normalisation` block lists each replaced alias and the open punch-list, so the cell owner can fix the inconsistency at source.
+
+**Edge-to-edge polish:**
+- **Phase-based button labels:** *→ Export to Siemens Plant Simulation (Phase 4)* and *Choose a scenario in Static Scenario Planner (Phase 3) →*.
+- **No native browser dialogs:** `window.prompt()` and `window.alert()` are gone. Inline inputs handle scenario create, clone and rename, and mapping-profile names; non-blocking toast banners handle status messages.
+- **Deeper Next Actions links:** they now open sub-tabs directly (Dictionary Defaults for drift tolerances, Catalogue Importer, Alias Dictionary, Live Drift).
+- **Justifications inside scenarios:** with a scenario selected in *Fixed Process Baseline → Reconcile*, drift justifications are recorded inside that scenario. On promotion they are merged into the live baseline, while the live locked Fixed Process layer stays authoritative.
+
 ## Calculation rules
 
 All core functions in `src/engine/` carry JSDoc comments.
@@ -361,6 +412,8 @@ The `samples/` folder holds ready-made inputs for each importer:
 - `legacy-capacity-bom.xlsx`
 - `des-results.csv`
 - `plantsim-statistics.csv`
+- `passports/Cell_A_nicknames_rev5.json`: nicknames only, so it auto-ingests silently and CELL-A is flagged *Needs Data Action*
+- `passports/CEL-D_typo_rev.json`: near-duplicate typos, so the preview offers *Map & Remember Alias*
 - `fixed-process-rev-C.xlsx`, the locked Fixed Process Baseline
 - `fixed-process-ATLAS-rev-D.csv`, an updated revision to try *Compare / Ingest*
 
@@ -379,7 +432,7 @@ src/engine/     types, bom, rollup, mapping, ingest, model (audit/KPIs/services)
                 services (spec sheet), des, importer, legacy, whatif, scenario (Workspace 7),
                 stores (V1.2), tecnomatix (V1.2), integrity (V1.2), governance (V1.2),
                 fixedprocess (V1.3), systemmap (V1.3),
-                smartimport / nextactions / navigation (V1.4),
+                smartimport / nextactions / navigation (V1.4), aliases (V1.5),
                 sheet (SheetJS), csv
 src/data/       deterministic F1–F4 baseline
 src/store/      IndexedDB/localStorage persistence + React context

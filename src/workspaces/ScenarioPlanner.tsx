@@ -49,7 +49,7 @@ import { canPromote } from '../engine/governance';
 type Tab = 'compare' | 'topology' | 'assets' | 'routes' | 'presets';
 
 export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { state, scenarios, newScenario, renameScenario, deleteScenario, promoteScenario, setDesSourceId, setScenarioStatus } = useHub();
+  const { state, scenarios, newScenario, renameScenario, deleteScenario, promoteScenario, setDesSourceId, setScenarioStatus, notify } = useHub();
   const [activeId, setActiveId] = useState<string | undefined>(scenarios[0]?.id);
   const [tab, setTab] = useState<Tab>('compare');
   useEffect(() => {
@@ -64,11 +64,21 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
   const colourOf = (id: string) => SCENARIO_COLOURS[Math.max(0, scenarios.findIndex((s) => s.id === id)) % SCENARIO_COLOURS.length];
   const nextName = () => `Scenario ${String.fromCharCode(65 + (scenarios.length % 26))}`;
 
-  const create = (sourceId = LIVE_ID) => {
-    const name = prompt('Scenario name', nextName());
-    if (!name) return;
-    const sc = newScenario(name, sourceId);
-    setActiveId(sc.id);
+  // Inline name entry (V1.5) replaces window.prompt() for create / clone / rename.
+  const [naming, setNaming] = useState<{ mode: 'create' | 'clone' | 'rename'; sourceId: string; value: string } | null>(null);
+  const commitName = () => {
+    if (!naming) return;
+    const name = naming.value.trim();
+    if (!name) return notify('Enter a scenario name', 'warning');
+    if (naming.mode === 'rename') {
+      renameScenario(naming.sourceId, name);
+      notify(`Renamed to “${name}”`, 'good');
+    } else {
+      const sc = newScenario(name, naming.sourceId);
+      setActiveId(sc.id);
+      notify(`Created “${name}” from ${naming.sourceId === LIVE_ID ? 'the Live Baseline' : 'the active scenario'}`, 'good');
+    }
+    setNaming(null);
   };
 
   return (
@@ -78,14 +88,22 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
         subtitle="Each scenario holds its own deep copy of the hub state in IndexedDB. Live ingested Cell Passports are never touched until a scenario is promoted."
         actions={
           <>
-            <Button variant="primary" onClick={() => create(LIVE_ID)}>+ New from Live Baseline</Button>
-            <Button disabled={!active} onClick={() => active && create(active.id)}>⧉ Clone active</Button>
+            <Button variant="primary" onClick={() => setNaming({ mode: 'create', sourceId: LIVE_ID, value: nextName() })}>+ New from Live Baseline</Button>
+            <Button disabled={!active} onClick={() => active && setNaming({ mode: 'clone', sourceId: active.id, value: `${active.name} (copy)` })}>⧉ Clone active</Button>
             {scenarios.length === 0 && (
               <Button onClick={() => { const ids = ['Scenario A', 'Scenario B', 'Scenario C'].map((n) => newScenario(n).id); setActiveId(ids[0]); }}>Create A, B, C</Button>
             )}
           </>
         }
       >
+        {naming && (
+          <form className="mb-3 flex flex-wrap items-center gap-2 rounded border border-blue-200 bg-blue-50/50 p-2 text-xs" onSubmit={(e) => { e.preventDefault(); commitName(); }}>
+            <span className="font-medium text-slate-700">{naming.mode === 'rename' ? 'Rename scenario' : naming.mode === 'clone' ? 'Clone active scenario as' : 'New scenario from Live Baseline'}</span>
+            <input autoFocus aria-label="Scenario name" className={`${input} w-64`} value={naming.value} onChange={(e) => setNaming({ ...naming, value: e.target.value })} onKeyDown={(e) => e.key === 'Escape' && setNaming(null)} />
+            <Button type="submit" variant="primary">{naming.mode === 'rename' ? 'Save' : 'Create'}</Button>
+            <Button onClick={() => setNaming(null)}>Cancel</Button>
+          </form>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
             <i className="inline-block h-2.5 w-2.5 rounded-full bg-slate-500" /> Live Baseline
@@ -113,8 +131,8 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
               {(active.status ?? 'Draft') === 'Draft' && <Button onClick={() => setScenarioStatus(active.id, 'Reviewed')}>Mark Reviewed</Button>}
               {active.status === 'Reviewed' && <Button onClick={() => setScenarioStatus(active.id, 'Approved Baseline')}>Approve for Baseline</Button>}
               {active.status && active.status !== 'Draft' && <Button variant="ghost" onClick={() => setScenarioStatus(active.id, 'Draft')}>Return to Draft</Button>}
-              <Button onClick={() => { const n = prompt('Rename scenario', active.name); if (n) renameScenario(active.id, n); }}>Rename</Button>
-              <Button onClick={() => { setDesSourceId(active.id); navigate({ ws: 'des' }); }}>→ Export to DES (Workspace 6)</Button>
+              <Button onClick={() => setNaming({ mode: 'rename', sourceId: active.id, value: active.name })}>Rename</Button>
+              <Button onClick={() => { setDesSourceId(active.id); navigate({ ws: 'des' }); }}>→ Export to Siemens Plant Simulation (Phase 4)</Button>
               <Button variant="danger" onClick={() => confirm(`Delete scenario “${active.name}”?`) && deleteScenario(active.id)}>Delete</Button>
               <Button
                 variant="primary"
@@ -126,10 +144,10 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
                   try {
                     await promoteScenario(active.id);
                   } catch (e) {
-                    alert((e as Error).message);
+                    notify((e as Error).message, 'critical');
                     return;
                   }
-                  alert(`“${active.name}” is now the Live Baseline. A snapshot of the previous live state was saved.`);
+                  notify(`“${active.name}” is now the Live Baseline — a snapshot of the previous live state was saved and drift justifications were carried over.`, 'good');
                 }}
               >
                 ⬆ Promote Scenario to Live Baseline
@@ -387,7 +405,7 @@ function TopologyPanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation;
           </div>
         )}
       </Card>
-      <Card title={`Factory footprint & utility ceilings — ${sc.name} vs Baseline`} subtitle="Same basis as Workspace 1 and Buffers & Stores: cells (Σ asset m² × 1.20 + 8 m²) × 1.35 circulation, plus stores & buffers, against each factory's floorAreaM2 ceiling; utilities against plant ceilings.">
+      <Card title={`Factory footprint & utility ceilings — ${sc.name} vs Baseline`} subtitle="Same basis as the Factory Control Hub and Buffers & Stores: cells (Σ asset m² × 1.20 + 8 m²) × 1.35 circulation, plus stores & buffers, against each factory's floorAreaM2 ceiling; utilities against plant ceilings.">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

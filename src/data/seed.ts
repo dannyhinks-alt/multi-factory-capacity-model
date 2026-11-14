@@ -671,6 +671,26 @@ export function buildSeedState(): HubState {
   };
   state.tecnomatixStats = [];
   state.fixedProcess = buildSeedFixedProcess(passports, mappings, now);
+  // V1.5 Alias Dictionary: nicknames seen in incoming Cell Passports → canonical IDs.
+  state.aliases = [
+    { domain: 'cell', alias: 'Cell_A', canonical: 'CELL-A', source: 'seed', createdAt: now, note: 'Cell Design Passport app default naming' },
+    { domain: 'cell', alias: 'CNC Cell 01', canonical: 'CELL-A', source: 'seed', createdAt: now },
+    { domain: 'cell', alias: 'Grind_01', canonical: 'CELL-K', source: 'seed', createdAt: now },
+    { domain: 'part', alias: 'ATL100', canonical: 'ATL-100', source: 'seed', createdAt: now },
+    { domain: 'asset', alias: 'DMU-50-1', canonical: 'CELL-A-VMC5-01', source: 'seed', createdAt: now, note: 'Machine nameplate used by the cell team' },
+    { domain: 'asset', alias: 'STUDER-1', canonical: 'CELL-K-GRIND-01', source: 'seed', createdAt: now },
+    { domain: 'tooling', alias: 'FIX-ATL-01', canonical: 'FX-ATL-100-DM-W-01', source: 'seed', createdAt: now },
+  ];
+  // CELL-K was ingested from a passport that still used nicknames → flagged “Needs Data Action”.
+  const cellK = passports.find((p) => p.cellId === 'CELL-K')!;
+  cellK.ingestNotes = {
+    ingestedAt: now,
+    sourceFile: 'Grind_01_passport_rev1.json',
+    aliasesApplied: [
+      { domain: 'cell', from: 'Grind_01', to: 'CELL-K', field: 'cellId' },
+      { domain: 'asset', from: 'STUDER-1', to: 'CELL-K-GRIND-01', field: 'assets[0].assetId' },
+    ],
+  };
   return state;
 }
 

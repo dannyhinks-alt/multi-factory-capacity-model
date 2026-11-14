@@ -4970,6 +4970,24 @@
         "extractionM3h": 3242,
         "craneTonnes": 1,
         "coolantLpm": 177
+      },
+      "ingestNotes": {
+        "ingestedAt": "2026-11-01T09:00:00.000Z",
+        "sourceFile": "Grind_01_passport_rev1.json",
+        "aliasesApplied": [
+          {
+            "domain": "cell",
+            "from": "Grind_01",
+            "to": "CELL-K",
+            "field": "cellId"
+          },
+          {
+            "domain": "asset",
+            "from": "STUDER-1",
+            "to": "CELL-K-GRIND-01",
+            "field": "assets[0].assetId"
+          }
+        ]
       }
     },
     {

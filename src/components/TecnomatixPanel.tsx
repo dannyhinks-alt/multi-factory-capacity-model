@@ -62,7 +62,7 @@ export function TecnomatixPanel({ model, state, sourceName, navigate, initialSta
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Pills value={preview} onChange={setPreview} options={TABLES.map((t) => ({ value: t, label: t, count: tx[t].length }))} />
-          <Button variant="ghost" onClick={() => navigate({ ws: 'scenarios' })}>Choose a scenario in Workspace 7 →</Button>
+          <Button variant="ghost" onClick={() => navigate({ ws: 'scenarios' })}>Choose a scenario in Static Scenario Planner (Phase 3) →</Button>
         </div>
         <div className="max-h-72 overflow-auto scroll-thin">
           <table className="w-full">

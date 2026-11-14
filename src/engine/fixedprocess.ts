@@ -495,3 +495,13 @@ export function baselineRows(steps: FixedProcessStep[]): Record<string, unknown>
     'Mandatory Step': s.mandatory ? 'Y' : 'N',
   }));
 }
+
+/**
+ * Promotion merge (V1.5): the locked Fixed Process layer stays authoritative from the Live Baseline
+ * (scenarios cannot change it), while drift justifications recorded inside the scenario are carried over
+ * (scenario entries win over live ones for the same drift).
+ */
+export function mergeFixedProcessOnPromotion(live: FixedProcessBaseline | undefined, scenario: FixedProcessBaseline | undefined): FixedProcessBaseline | undefined {
+  if (!live) return scenario;
+  return { ...live, justifications: { ...live.justifications, ...(scenario?.justifications ?? {}) } };
+}

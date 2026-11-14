@@ -35,10 +35,10 @@ const pctTxt = (n: number) => (Number.isFinite(n) ? `${n >= 0 ? '+' : '−'}${Ma
  * Phase 2 · Fixed Process Baseline: the locked reference layer (Document ID + Revision), live drift
  * reconciliation of Working Cell Routes (or any scenario) and the Compare / Ingest Updated Revision workflow.
  */
-export default function FixedProcess({ navigate }: { navigate: (t: NavTarget) => void }) {
+export default function FixedProcess({ navigate, initialTab }: { navigate: (t: NavTarget) => void; initialTab?: string }) {
   const { state, scenarios, takePendingImport, pendingImport } = useHub();
   const [sourceId, setSourceId] = useState(LIVE_ID);
-  const [tab, setTab] = useState<'drift' | 'baseline' | 'revision'>('drift');
+  const [tab, setTab] = useState<'drift' | 'baseline' | 'revision'>(initialTab === 'baseline' || initialTab === 'revision' ? initialTab : 'drift');
   // Smart Import hand-off: open the revision diff with the detected file pre-loaded.
   const [incomingFile, setIncomingFile] = useState<File | null>(null);
   useEffect(() => {
@@ -80,15 +80,15 @@ export default function FixedProcess({ navigate }: { navigate: (t: NavTarget) =>
         </div>
       </Card>
       <Pills value={tab} onChange={setTab} options={[{ value: 'drift', label: 'Live Drift Reconciliation' }, { value: 'baseline', label: 'Locked Baseline Documents' }, { value: 'revision', label: 'Compare / Ingest Updated Revision' }]} />
-      {tab === 'drift' && <DriftView items={report.items} byCell={report.byCell} readOnly={!!source} navigate={navigate} />}
+      {tab === 'drift' && <DriftView items={report.items} byCell={report.byCell} scenarioId={source?.id} scenarioName={source?.name} navigate={navigate} />}
       {tab === 'baseline' && <BaselineView />}
       {tab === 'revision' && <RevisionView initialFile={incomingFile} />}
     </>
   );
 }
 
-function DriftView({ items, byCell, readOnly, navigate }: { items: DriftItem[]; byCell: ReturnType<typeof reconcile>['byCell']; readOnly: boolean; navigate: (t: NavTarget) => void }) {
-  const { update, state } = useHub();
+function DriftView({ items, byCell, scenarioId, scenarioName, navigate }: { items: DriftItem[]; byCell: ReturnType<typeof reconcile>['byCell']; scenarioId?: string; scenarioName?: string; navigate: (t: NavTarget) => void }) {
+  const { update, state, editScenarioById, notify } = useHub();
   const [cls, setCls] = useState<DriftClass | 'issues'>('issues');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -96,7 +96,15 @@ function DriftView({ items, byCell, readOnly, navigate }: { items: DriftItem[]; 
   const actor = governanceOf(state).currentUser;
   const rows = items.filter((i) => (cls === 'issues' ? i.cls !== 'ALIGNED' : i.cls === cls) && (!q || `${i.cellId} ${i.bomPartId} ${i.description} ${i.docId}`.toLowerCase().includes(q.toLowerCase())));
   const justify = (it: DriftItem, status: 'Proposed' | 'Approved' | 'Rejected') => {
-    update((s) => setJustification(s, it.key, { note: note || it.justification?.note || '', status, by: actor }));
+    const j = { note: note || it.justification?.note || '', status, by: actor };
+    if (scenarioId) {
+      // Justifications recorded inside a scenario travel with it and are carried over on promotion.
+      editScenarioById(scenarioId, (d) => {
+        d.fixedProcess = setJustification(d, it.key, j).fixedProcess;
+        return `Drift ${it.cellId} ${it.bomPartId} op ${it.opNo}: ${status}`;
+      });
+      notify(`${status} in scenario “${scenarioName}” — carried over if the scenario is promoted`, 'good');
+    } else update((s) => setJustification(s, it.key, j));
     setOpen(null);
     setNote('');
   };
@@ -118,7 +126,7 @@ function DriftView({ items, byCell, readOnly, navigate }: { items: DriftItem[]; 
       </Card>
       <Card
         title="Working Route ↔ Fixed Process reconciliation"
-        subtitle={readOnly ? 'Scenario view (read-only) — justifications are recorded against the Live Working Design.' : 'Add an engineering justification and approve drifts you intend to adopt in the next Fixed Process revision (ECR Release Pack).'}
+        subtitle={scenarioId ? `Scenario “${scenarioName}” — justifications recorded here stay with the scenario and are carried over to the Live Baseline on promotion.` : 'Add an engineering justification and approve drifts you intend to adopt in the next Fixed Process revision (ECR Release Pack).'}
         actions={<Button onClick={() => download('fixed-process-drift.csv', toCsv(items.map((i) => ({ class: i.cls, factory: i.factory, cellId: i.cellId, routeId: i.routeId, bomPartId: i.bomPartId, docId: i.docId, revision: i.revision, opNo: i.opNo, description: i.description, stdSetupMin: i.std?.stdSetupMin ?? '', workSetupMin: i.work?.setupMin ?? '', setupDeltaPct: i.dSetupPct, stdCycleMin: i.std?.stdCycleMin ?? '', workCycleMin: i.work?.cycleMin ?? '', cycleDeltaPct: i.dCyclePct, reasons: i.reasons.join('; '), justification: i.justification?.note ?? '', status: i.justification?.status ?? '' }))), 'text/csv')}>⬇ CSV</Button>}
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -149,7 +157,7 @@ function DriftView({ items, byCell, readOnly, navigate }: { items: DriftItem[]; 
                         {i.justification ? (
                           <div><Badge tone={i.justification.status === 'Approved' ? 'good' : i.justification.status === 'Rejected' ? 'critical' : 'info'}>{i.justification.status}</Badge> <span className="text-slate-500">{i.justification.by}</span><div className="text-slate-700">{i.justification.note}</div></div>
                         ) : <span className="text-slate-400">—</span>}
-                        {!readOnly && i.cls !== 'ALIGNED' && <button className="mt-1 block text-blue-700 hover:underline" onClick={() => { setOpen(open === i.key ? null : i.key); setNote(i.justification?.note ?? ''); }}>{i.justification ? 'Update' : 'Justify'}</button>}
+                        {i.cls !== 'ALIGNED' && <button className="mt-1 block text-blue-700 hover:underline" onClick={() => { setOpen(open === i.key ? null : i.key); setNote(i.justification?.note ?? ''); }}>{i.justification ? 'Update' : 'Justify'}</button>}
                       </td>
                     </tr>
                     {open === i.key && (
@@ -224,7 +232,7 @@ function BaselineView() {
 }
 
 function RevisionView({ initialFile }: { initialFile?: File | null }) {
-  const { state, update } = useHub();
+  const { state, update, notify } = useHub();
   const [sheets, setSheets] = useState<SheetData[] | null>(null);
   const [sheetIdx, setSheetIdx] = useState(0);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -246,7 +254,7 @@ function RevisionView({ initialFile }: { initialFile?: File | null }) {
       setWarnings(p.warnings);
       setDone('');
     } catch (e) {
-      alert(`Could not read file: ${(e as Error).message}`);
+      notify(`Could not read file: ${(e as Error).message}`, 'critical');
     }
   };
   useEffect(() => {
