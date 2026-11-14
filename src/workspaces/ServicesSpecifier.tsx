@@ -5,9 +5,9 @@ import { SERVICE_KEYS, SERVICE_LABELS } from '../engine/settings';
 import type { FactoryId, SharedPlantItem } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
-import { StoresPanel } from '../components/StoresPanel';
 
-export default function ServicesSpecifier({ focusCell }: { focusCell?: string }) {
+/** Phase 4 · Cell Facilities & CapEx Spec Sheet (1-click .csv / .png / .json). */
+export function SpecSheetCard({ focusCell }: { focusCell?: string }) {
   const { model, state } = useHub();
   const [cellId, setCellId] = useState(focusCell && model.cellById.has(focusCell) ? focusCell : 'CELL-A');
   const cell = model.cellById.get(cellId) ?? model.cells[0];
@@ -74,11 +74,16 @@ export default function ServicesSpecifier({ focusCell }: { focusCell?: string })
           </div>
         </Card>
       )}
-      <div className="grid gap-4 2xl:grid-cols-2">
-        {FACTORIES.map((f) => <FactoryBalance key={f} factory={f} />)}
-      </div>
-      <StoresPanel />
     </>
+  );
+}
+
+/** Phase 3 · Facility & Cell Services: factory-level shared plant vs utility capacity across F1–F4. */
+export default function ServicesSpecifier() {
+  return (
+    <div className="grid gap-4 2xl:grid-cols-2">
+      {FACTORIES.map((f) => <FactoryBalance key={f} factory={f} />)}
+    </div>
   );
 }
 

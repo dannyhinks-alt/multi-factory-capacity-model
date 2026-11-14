@@ -14,6 +14,7 @@ import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector, SignOffStatus } from './types';
 import { FACTORIES, QUARTERS, STORE_TIER_NAMES } from './types';
 import { solveWhatIf } from './whatif';
+import { DRIFT_SEVERITY, reconcile } from './fixedprocess';
 
 // ---------------------------------------------------------------- scenario container
 
@@ -580,6 +581,11 @@ export interface ScenarioMetrics {
   storesFootprintM2: number;
   workingCapitalGbp: number;
   wipBuffers: number;
+  /** Fixed Process drift (V1.3). */
+  processAlignmentPct: number;
+  complianceDeviations: number;
+  maturingDrifts: number;
+  newLocalSteps: number;
   cells: number;
   unmappedParts: number;
   limitingCells: { cellId: string; utilisationPct: number; constraint: ConstraintKind }[];
@@ -675,6 +681,10 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
     storesFootprintM2: model.stores.totals.footprintM2,
     workingCapitalGbp: model.stores.totals.workingCapitalGbp,
     wipBuffers: model.stores.buffers.length,
+    ...(() => {
+      const d = reconcile(state);
+      return { processAlignmentPct: d.alignmentPct, complianceDeviations: d.counts['COMPLIANCE DEVIATION'], maturingDrifts: d.counts['MATURING DRIFT'], newLocalSteps: d.counts['NEW LOCAL STEP'] };
+    })(),
     peakOverloads: model.cells.filter((c) => c.annualDemand > 0 && c.peakQuarterUtilisationPct >= state.settings.bottleneckPct).length,
     cells: model.cells.length,
     unmappedParts: model.audit.unmappedBomNodes.length,
@@ -787,6 +797,8 @@ export const MATRIX_ROWS: MatrixRow[] = [
   { key: 'footprint', label: 'Footprint (incl. 35% circulation)', unit: 'm²', better: 'lower', get: (e) => e.metrics.footprintM2 },
   { key: 'storesFootprint', label: 'Stores & buffer footprint', unit: 'm²', better: 'lower', get: (e) => e.metrics.storesFootprintM2 },
   { key: 'workingCapital', label: 'Working capital tied up', unit: '£', better: 'lower', get: (e) => e.metrics.workingCapitalGbp },
+  { key: 'processAlignment', label: 'Fixed Process alignment', unit: '%', better: 'higher', get: (e) => e.metrics.processAlignmentPct },
+  { key: 'complianceDeviations', label: 'Fixed Process compliance deviations', unit: 'count', better: 'lower', get: (e) => e.metrics.complianceDeviations },
   { key: 'utilityOverruns', label: 'Utility overruns (Red)', unit: 'count', better: 'lower', get: (e) => e.metrics.utilityRed },
   { key: 'spaceOverruns', label: 'Space ceiling overruns', unit: 'count', better: 'lower', get: (e) => e.metrics.spaceOverruns.length },
   { key: 'oee', label: 'OEE', unit: '%', better: 'higher', get: (e) => e.metrics.oeePct },
@@ -810,7 +822,7 @@ export function deltaOf(row: MatrixRow, base: ScenarioEvaluation, sc: ScenarioEv
 
 export interface Effect {
   severity: 'critical' | 'warning' | 'good' | 'info';
-  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing' | 'Stores';
+  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing' | 'Stores' | 'Process';
   effect: string;
   causes: string[];
 }
@@ -1052,6 +1064,19 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
     if (ceiling > 0 && was !== now) {
       effects.push({ severity: now ? 'critical' : 'good', area: 'Space', effect: `${f} floor space ${now ? 'exceeds' : 'back within'} its ${Math.round(ceiling).toLocaleString('en-GB')} m² ceiling`, causes: [...added.filter((c) => c.factory === f).map((c) => `${c.cellId} adds ${c.totalFootprintM2.toFixed(0)} m² cell envelope (+35% circulation)`), ...movedCells.filter((c) => c.factory === f).map((c) => `${c.cellId} relocated in (${c.totalFootprintM2.toFixed(0)} m²)`), ...removed.filter((c) => c.factory === f).map((c) => `${c.cellId} removed`), `Stores & buffers ${bm.stores.byFactory[f].footprintM2.toFixed(0)} → ${sm.stores.byFactory[f].footprintM2.toFixed(0)} m²`] });
     }
+  }
+
+  // Fixed Process drift chain (V1.3)
+  if (sc.metrics.complianceDeviations !== base.metrics.complianceDeviations || sc.metrics.maturingDrifts !== base.metrics.maturingDrifts || sc.metrics.newLocalSteps !== base.metrics.newLocalSteps) {
+    const before = new Map(reconcile(bs).items.map((i) => [i.key, i.cls]));
+    const changed = reconcile(ss).items.filter((i) => before.get(i.key) !== i.cls);
+    const worse = changed.filter((i) => DRIFT_SEVERITY[i.cls] > DRIFT_SEVERITY[before.get(i.key) ?? 'ALIGNED']);
+    effects.push({
+      severity: sc.metrics.complianceDeviations > base.metrics.complianceDeviations ? 'critical' : worse.length ? 'warning' : 'good',
+      area: 'Process',
+      effect: `Fixed Process alignment ${base.metrics.processAlignmentPct.toFixed(1)}% → ${sc.metrics.processAlignmentPct.toFixed(1)}%; compliance deviations ${base.metrics.complianceDeviations} → ${sc.metrics.complianceDeviations}, maturing drifts ${base.metrics.maturingDrifts} → ${sc.metrics.maturingDrifts}`,
+      causes: changed.slice(0, 8).map((i) => `${i.cellId} ${i.bomPartId} op ${i.opNo}: ${before.get(i.key) ?? 'not compared'} → ${i.cls}${i.reasons.length ? ` (${i.reasons[0]})` : ''}`),
+    });
   }
 
   // Buffers, WIP & Stores chain

@@ -117,8 +117,8 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
         <AuditPanel scope={scope} onCell={(id) => navigate({ ws: 'cells', cellId: id })} />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
-        <IntegrityPanel compact onOpen={() => navigate({ ws: 'master', tab: 'integrity' })} />
-        <Card title="Buffers, WIP & Stores" subtitle="RM stores · kitting · inter-cell WIP buffers · despatch staging" actions={<Button variant="ghost" onClick={() => navigate({ ws: 'services' })}>Open →</Button>}>
+        <IntegrityPanel compact onOpen={() => navigate({ ws: 'integrity' })} />
+        <Card title="Buffers, WIP & Stores" subtitle="RM stores · kitting · inter-cell WIP buffers · despatch staging" actions={<Button variant="ghost" onClick={() => navigate({ ws: 'stores' })}>Open →</Button>}>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {STORE_TIERS.map((t) => {
               const r = scope === 'All' ? model.stores.totals.tiers[t] : model.stores.byFactory[scope].tiers[t];

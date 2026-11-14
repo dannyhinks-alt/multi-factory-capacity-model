@@ -136,8 +136,9 @@ export function buildTecnomatixExport(model: HubModel, state: HubState): TxExpor
   for (const p of state.passports) {
     const sp = p.shiftPattern;
     for (let i = 0; i < Math.min(3, sp.shiftsPerDay); i++) {
-      const brk = 30;
-      const start = SHIFTS[i].start;
+      const brk = state.settings.plantSim?.breakMin ?? 30;
+      const configured = state.settings.plantSim?.shiftStarts?.[i];
+      const start = configured && /^\d{1,2}:\d{2}$/.test(configured) ? Number(configured.split(':')[0]) + Number(configured.split(':')[1]) / 60 : SHIFTS[i].start;
       ShiftCalendar_DataTable.push({
         Calendar_Path: `${TX_ROOT}.${txName(p.factory)}.${txName(p.cellId)}.ShiftCalendar`,
         Shift_Name: SHIFTS[i].name,
