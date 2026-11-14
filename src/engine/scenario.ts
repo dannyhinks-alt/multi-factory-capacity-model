@@ -11,8 +11,8 @@ import { computeModel, factoryKpis, type HubModel } from './model';
 import { routeKey } from './mapping';
 import type { CellMacroBlock, RouteMacroBlock } from './rollup';
 import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
-import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector } from './types';
-import { FACTORIES, QUARTERS } from './types';
+import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector, SignOffStatus } from './types';
+import { FACTORIES, QUARTERS, STORE_TIER_NAMES } from './types';
 import { solveWhatIf } from './whatif';
 
 // ---------------------------------------------------------------- scenario container
@@ -31,6 +31,10 @@ export interface Scenario {
   updatedAt: string;
   state: HubState;
   log: ScenarioLogEntry[];
+  /** Scenario sign-off (V1.2): Draft → Reviewed → Approved Baseline (approved for promotion). */
+  status?: SignOffStatus;
+  signedOffBy?: string;
+  signedOffAt?: string;
 }
 
 export const LIVE_ID = 'live';
@@ -45,7 +49,7 @@ export function createScenario(source: HubState, name: string, basedOn = 'Live B
   const state = clone(source);
   state.ingestLog = state.ingestLog.slice(0, 5);
   const at = nowIso();
-  return { id: uid('scn'), name, description, basedOn, createdAt: at, updatedAt: at, state, log: [{ at, text: `Created from ${basedOn}` }] };
+  return { id: uid('scn'), name, description, basedOn, createdAt: at, updatedAt: at, state, log: [{ at, text: `Created from ${basedOn}` }], status: 'Draft' };
 }
 
 /** Copy-on-write edit: the mutator works on a deep clone; the original scenario object is never changed. */
@@ -54,7 +58,9 @@ export function editScenario(sc: Scenario, mutate: (draft: HubState) => string |
   const text = mutate(draft) || 'Edit';
   const at = nowIso();
   draft.updatedAt = at;
-  return { ...sc, state: draft, updatedAt: at, log: [{ at, text }, ...sc.log].slice(0, 200) };
+  const reset = sc.status && sc.status !== 'Draft';
+  const log = [{ at, text }, ...(reset ? [{ at, text: `Sign-off reset: ${sc.status} → Draft (scenario edited)` }] : []), ...sc.log].slice(0, 200);
+  return { ...sc, state: draft, updatedAt: at, log, status: 'Draft', signedOffBy: reset ? undefined : sc.signedOffBy, signedOffAt: reset ? undefined : sc.signedOffAt };
 }
 
 /** Pure helper: apply a mutator to a clone of any state (used by tests and presets preview). */
@@ -66,10 +72,8 @@ export function applyToClone(state: HubState, mutate: (draft: HubState) => strin
 
 // ---------------------------------------------------------------- cost helpers
 
-/** Fixed recommissioning cost per relocated or merged cell (£). */
-export const RELOCATION_FIXED_GBP = 15000;
-/** Rigging / transport allowance as a share of asset CapEx when relocating. */
-export const RELOCATION_RIGGING_PCT = 5;
+/** Fixed cost (£) for moving individual machine units between cells. */
+export const UNIT_MOVE_FIXED_GBP = 5000;
 export const DECOMMISSION_FIXED_GBP = 10000;
 
 function assetCost(s: HubState, p: CellPassport, assetId: string) {
@@ -79,15 +83,16 @@ function assetCost(s: HubState, p: CellPassport, assetId: string) {
 }
 
 /**
- * Relocation CapEx: Σ qty × (re-install £ + 5% rigging of asset CapEx) + £15k recommissioning per cell.
+ * Relocation CapEx: Σ qty × (re-install £ + rigging % of asset CapEx) + recommissioning £ per cell.
+ * Rigging % (default 5%) and recommissioning £ (default £15k) are editable Dictionary defaults.
  */
 export function relocationCostGbp(s: HubState, p: CellPassport, units?: { assetId: string; qty: number }[]): number {
   const list = units ?? p.assets.map((a) => ({ assetId: a.assetId, qty: a.qty }));
   const assets = list.reduce((t, u) => {
     const c = assetCost(s, p, u.assetId);
-    return t + u.qty * (c.install + (c.capex * RELOCATION_RIGGING_PCT) / 100);
+    return t + u.qty * (c.install + (c.capex * s.settings.relocationRiggingPct) / 100);
   }, 0);
-  return assets + (units ? 5000 : RELOCATION_FIXED_GBP);
+  return assets + (units ? UNIT_MOVE_FIXED_GBP : s.settings.recommissioningGbp);
 }
 
 /** Replication CapEx: a second identical cell — Σ qty × (CapEx + install) + tooling. */
@@ -571,6 +576,10 @@ export interface ScenarioMetrics {
   pcePct: number;
   /** Cells whose peak quarter exceeds the bottleneck threshold (launch-ramp / phasing stress). */
   peakOverloads: number;
+  /** Buffers, WIP & Stores (V1.2). */
+  storesFootprintM2: number;
+  workingCapitalGbp: number;
+  wipBuffers: number;
   cells: number;
   unmappedParts: number;
   limitingCells: { cellId: string; utilisationPct: number; constraint: ConstraintKind }[];
@@ -629,7 +638,8 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
     const ceiling = state.utilities.find((u) => u.factory === f)?.floorAreaM2 ?? 0;
     footprintM2 += fk.factoryFootprintM2;
     floorAreaM2 += ceiling;
-    if (ceiling > 0 && fk.factoryFootprintM2 > ceiling) spaceOverruns.push(f);
+    // Space ceiling covers cells (incl. circulation) plus stores & buffers.
+    if (ceiling > 0 && fk.totalFootprintM2 > ceiling) spaceOverruns.push(f);
   }
   const utilityOverruns: string[] = [];
   let utilityRed = 0;
@@ -662,6 +672,9 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
     oeePct: k.avgOeePct,
     teepPct: k.avgTeepPct,
     pcePct: k.pce.pct,
+    storesFootprintM2: model.stores.totals.footprintM2,
+    workingCapitalGbp: model.stores.totals.workingCapitalGbp,
+    wipBuffers: model.stores.buffers.length,
     peakOverloads: model.cells.filter((c) => c.annualDemand > 0 && c.peakQuarterUtilisationPct >= state.settings.bottleneckPct).length,
     cells: model.cells.length,
     unmappedParts: model.audit.unmappedBomNodes.length,
@@ -772,6 +785,8 @@ export const MATRIX_ROWS: MatrixRow[] = [
   { key: 'unitCost', label: 'Unit conversion cost', unit: '£', better: 'lower', get: (e) => e.metrics.unitConversionCostGbp },
   { key: 'payback', label: 'Payback', unit: 'yrs', better: 'lower', get: (e) => e.paybackYears },
   { key: 'footprint', label: 'Footprint (incl. 35% circulation)', unit: 'm²', better: 'lower', get: (e) => e.metrics.footprintM2 },
+  { key: 'storesFootprint', label: 'Stores & buffer footprint', unit: 'm²', better: 'lower', get: (e) => e.metrics.storesFootprintM2 },
+  { key: 'workingCapital', label: 'Working capital tied up', unit: '£', better: 'lower', get: (e) => e.metrics.workingCapitalGbp },
   { key: 'utilityOverruns', label: 'Utility overruns (Red)', unit: 'count', better: 'lower', get: (e) => e.metrics.utilityRed },
   { key: 'spaceOverruns', label: 'Space ceiling overruns', unit: 'count', better: 'lower', get: (e) => e.metrics.spaceOverruns.length },
   { key: 'oee', label: 'OEE', unit: '%', better: 'higher', get: (e) => e.metrics.oeePct },
@@ -795,7 +810,7 @@ export function deltaOf(row: MatrixRow, base: ScenarioEvaluation, sc: ScenarioEv
 
 export interface Effect {
   severity: 'critical' | 'warning' | 'good' | 'info';
-  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing';
+  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing' | 'Stores';
   effect: string;
   causes: string[];
 }
@@ -1035,8 +1050,34 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
     const was = base.metrics.spaceOverruns.includes(f);
     const now = sc.metrics.spaceOverruns.includes(f);
     if (ceiling > 0 && was !== now) {
-      effects.push({ severity: now ? 'critical' : 'good', area: 'Space', effect: `${f} floor space ${now ? 'exceeds' : 'back within'} its ${Math.round(ceiling).toLocaleString('en-GB')} m² ceiling`, causes: [...added.filter((c) => c.factory === f).map((c) => `${c.cellId} adds ${c.totalFootprintM2.toFixed(0)} m² cell envelope (+35% circulation)`), ...movedCells.filter((c) => c.factory === f).map((c) => `${c.cellId} relocated in (${c.totalFootprintM2.toFixed(0)} m²)`), ...removed.filter((c) => c.factory === f).map((c) => `${c.cellId} removed`)] });
+      effects.push({ severity: now ? 'critical' : 'good', area: 'Space', effect: `${f} floor space ${now ? 'exceeds' : 'back within'} its ${Math.round(ceiling).toLocaleString('en-GB')} m² ceiling`, causes: [...added.filter((c) => c.factory === f).map((c) => `${c.cellId} adds ${c.totalFootprintM2.toFixed(0)} m² cell envelope (+35% circulation)`), ...movedCells.filter((c) => c.factory === f).map((c) => `${c.cellId} relocated in (${c.totalFootprintM2.toFixed(0)} m²)`), ...removed.filter((c) => c.factory === f).map((c) => `${c.cellId} removed`), `Stores & buffers ${bm.stores.byFactory[f].footprintM2.toFixed(0)} → ${sm.stores.byFactory[f].footprintM2.toFixed(0)} m²`] });
     }
+  }
+
+  // Buffers, WIP & Stores chain
+  const dWc = sc.metrics.workingCapitalGbp - base.metrics.workingCapitalGbp;
+  const dFp = sc.metrics.storesFootprintM2 - base.metrics.storesFootprintM2;
+  if (Math.abs(dWc) > 500 || Math.abs(dFp) > 1) {
+    const tierCauses = (['RM', 'KIT', 'WIP', 'FG'] as const)
+      .map((t) => ({ t, a: bm.stores.totals.tiers[t], b: sm.stores.totals.tiers[t] }))
+      .filter((x) => Math.abs(x.b.workingCapitalGbp - x.a.workingCapitalGbp) > 100 || Math.abs(x.b.footprintM2 - x.a.footprintM2) > 0.5)
+      .map((x) => `${STORE_TIER_NAMES[x.t]}: £${Math.round(x.a.workingCapitalGbp).toLocaleString('en-GB')} → £${Math.round(x.b.workingCapitalGbp).toLocaleString('en-GB')}, ${x.a.footprintM2.toFixed(0)} → ${x.b.footprintM2.toFixed(0)} m²`);
+    const bufB = new Map(bm.stores.buffers.map((b) => [b.bufferId, b]));
+    const bufCauses = sm.stores.buffers
+      .map((b) => ({ b, o: bufB.get(b.bufferId) }))
+      .filter(({ b, o }) => !o || Math.abs(b.recommendedUnits - o.recommendedUnits) >= Math.max(2, o.recommendedUnits * 0.15))
+      .sort((x, y) => Math.abs(y.b.recommendedUnits - (y.o?.recommendedUnits ?? 0)) - Math.abs(x.b.recommendedUnits - (x.o?.recommendedUnits ?? 0)))
+      .slice(0, 4)
+      .map(({ b, o }) => (o
+        ? `${b.bufferId}: ${o.recommendedUnits} → ${b.recommendedUnits} units (batch ${o.batchSize} → ${b.batchSize}, setup ${o.setupMin.toFixed(0)} → ${b.setupMin.toFixed(0)} min, OEE ${o.oeePct.toFixed(0)} → ${b.oeePct.toFixed(0)}%)`
+        : `New buffer ${b.bufferId} (${b.recommendedUnits} units${b.crossFactory ? `, cross-factory ${b.producerFactory} → ${b.factory}` : ''})`));
+    const gone = bm.stores.buffers.filter((b) => !sm.stores.buffers.some((x) => x.bufferId === b.bufferId)).slice(0, 2).map((b) => `Buffer ${b.bufferId} no longer required`);
+    effects.push({
+      severity: dWc > 0 ? 'warning' : 'good',
+      area: 'Stores',
+      effect: `Working capital ${dWc >= 0 ? '+' : '−'}£${Math.round(Math.abs(dWc)).toLocaleString('en-GB')}; stores & buffer footprint ${signed(dFp, 0)} m²`,
+      causes: [...tierCauses, ...bufCauses, ...gone].slice(0, 9),
+    });
   }
 
   // Cost chain

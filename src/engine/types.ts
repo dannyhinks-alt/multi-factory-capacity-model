@@ -164,6 +164,8 @@ export interface BomLine {
   leadTimeDays: number;
   makeBuy: 'Make' | 'Buy';
   uom: string;
+  /** Bought-in / material unit cost £ (L5 raw material & bought-out). Made parts roll up from children + conversion. */
+  unitCostGbp?: number;
 }
 
 /** Master Schedule demand for a top-level (L1) Assembly Variant. */
@@ -259,6 +261,85 @@ export interface Dictionary {
   contributionMarginGbp: number;
   /** Straight-line depreciation period (years) for unit conversion cost. */
   depreciationYears: number;
+  /** Relocation rigging / transport allowance as % of asset CapEx (Workspace 7). */
+  relocationRiggingPct: number;
+  /** Fixed recommissioning £ per relocated or merged cell (Workspace 7). */
+  recommissioningGbp: number;
+  /** Buffers, WIP & Stores (V1.2). */
+  stores: StoresDictionary;
+}
+
+export type StoreTier = 'RM' | 'KIT' | 'WIP' | 'FG';
+export const STORE_TIER_NAMES: Record<StoreTier, string> = {
+  RM: 'Raw Material & Bought-Out Stores (L5)',
+  KIT: 'Kitting / Marshalling Zones (L2–L4)',
+  WIP: 'Inter-Cell WIP Buffers / Line-Side Supermarkets',
+  FG: 'Finished Goods & Despatch Staging (L1)',
+};
+
+export interface StoreTierRule {
+  /** Target days of cover (RM / KIT / FG). WIP buffers are sized from batch, setup & OEE variability. */
+  daysCover: number;
+  /** Units held per storage location / stillage. */
+  unitsPerLocation: number;
+  /** Floor area per location incl. aisle share (m²). */
+  m2PerLocation: number;
+}
+
+export interface StoresDictionary {
+  tiers: Record<StoreTier, StoreTierRule>;
+  /** Service-level z-score for WIP safety stock (1.65 ≈ 95%). */
+  safetyZ: number;
+  /** Coefficient of variation of OEE (%) driving WIP buffer safety stock. */
+  oeeVariabilityCvPct: number;
+  /** Conversion cost £ per work-content minute used to roll up made-part standard cost. */
+  conversionGbpPerMin: number;
+  /** Working days per week for daily demand. */
+  workingDaysPerWeek: number;
+}
+
+/** Siemens Tecnomatix Plant Simulation statistics row (Station / Buffer / Drain). */
+export interface TxStat {
+  objectPath: string;
+  kind: 'Station' | 'Buffer' | 'Drain';
+  workingPct: number;
+  blockingPct: number;
+  waitingPct: number;
+  throughput?: number;
+}
+
+export type SignOffStatus = 'Draft' | 'Reviewed' | 'Approved Baseline';
+
+export type AuditAction =
+  | 'Baseline created'
+  | 'Baseline promotion'
+  | 'Cell Passport re-ingestion'
+  | 'Master Data import'
+  | 'Legacy workbook import'
+  | 'Baseline edit'
+  | 'Sign-off'
+  | 'Backup restore'
+  | 'Reset to seed'
+  | 'Snapshot rollback';
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  action: AuditAction;
+  actor: string;
+  versionFrom: string;
+  versionTo: string;
+  status: SignOffStatus;
+  details: string;
+}
+
+/** Baseline Change Governance: version, sign-off status and structured audit log. */
+export interface Governance {
+  major: number;
+  minor: number;
+  status: SignOffStatus;
+  currentUser: string;
+  auditLog: AuditEntry[];
 }
 
 export interface ColumnMappingProfile {
@@ -294,4 +375,7 @@ export interface HubState {
   subcontracts?: Subcontract[];
   macroOverrides?: Record<string, MacroOverride>;
   costAdjustments?: CostAdjustment[];
+  /** V1.2 governance & simulation statistics. */
+  governance?: Governance;
+  tecnomatixStats?: TxStat[];
 }

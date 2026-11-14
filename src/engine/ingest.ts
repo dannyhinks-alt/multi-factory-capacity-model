@@ -1,3 +1,4 @@
+import { recordAudit } from './governance';
 import { autoMatch, reconcileMappings } from './mapping';
 import type { CellPassport, Competence, FactoryId, HubState, MicroOp, PassportRoute, VaType } from './types';
 import { FACTORIES } from './types';
@@ -107,7 +108,7 @@ export interface IngestReport {
  * then auto-matches unmapped BOM parts and reconciles saved mappings so every cell's
  * rolled-up metrics land in its `Factory → Cell → BOM` slot with no manual re-entry.
  */
-export function ingestPassports(state: HubState, raws: { name: string; data: unknown }[], now = new Date().toISOString()): { state: HubState; report: IngestReport } {
+export function ingestPassports(state: HubState, raws: { name: string; data: unknown }[], now = new Date().toISOString(), audit = true): { state: HubState; report: IngestReport } {
   const report: IngestReport = { added: [], updated: [], skipped: [], autoMapped: 0, rerouted: [], stale: 0, errors: [], warnings: [] };
   const passports = new Map(state.passports.map((p) => [p.cellId, p]));
   for (const { name, data } of raws) {
@@ -141,14 +142,18 @@ export function ingestPassports(state: HubState, raws: { name: string; data: unk
     kind: 'passport' as const,
     message: `Ingested ${report.added.length} new / ${report.updated.length} updated passports; ${created.length} auto-mapped, ${rec.rerouted.length} re-routed, ${report.errors.length} errors`,
   };
+  const next: HubState = {
+    ...state,
+    passports: all,
+    mappings: [...rec.mappings, ...created],
+    ingestLog: [log, ...state.ingestLog].slice(0, 200),
+    updatedAt: now,
+  };
+  const changed = report.added.length + report.updated.length;
   return {
-    state: {
-      ...state,
-      passports: all,
-      mappings: [...rec.mappings, ...created],
-      ingestLog: [log, ...state.ingestLog].slice(0, 200),
-      updatedAt: now,
-    },
+    state: audit && changed
+      ? recordAudit(next, 'Cell Passport re-ingestion', `${report.added.length} new, ${report.updated.length} updated (${[...report.added, ...report.updated].slice(0, 12).join(', ')}${changed > 12 ? '…' : ''}); ${created.length} auto-mapped, ${rec.rerouted.length} re-routed, ${report.skipped.length} skipped, ${report.errors.length} errors`, { at: now })
+      : next,
     report,
   };
 }

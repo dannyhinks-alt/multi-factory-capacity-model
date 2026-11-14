@@ -1,3 +1,4 @@
+import { recordAudit } from './governance';
 import { fuzzyMapFields, toNum, type FieldSpec } from './importer';
 import { ingestPassports } from './ingest';
 import type { BomLevel, BomLine, CellPassport, ComplexityClass, Dictionary, FactoryId, HubState, RouteMapping, ScheduleLine } from './types';
@@ -168,12 +169,13 @@ export function applyLegacy(state: HubState, conv: LegacyConversion): HubState {
     schedule,
     mappings: [...state.mappings.filter((m) => !mapParts.has(m.bomPartId)), ...conv.mappings],
   };
-  const { state: next } = ingestPassports(base, conv.passports.map((p) => ({ name: p.cellId, data: p })), now);
-  return {
+  const { state: next } = ingestPassports(base, conv.passports.map((p) => ({ name: p.cellId, data: p })), now, false);
+  const msg = `Legacy workbook: ${conv.bom.length} BOM lines, ${conv.schedule.length} schedule lines, ${conv.passports.length} cells, ${conv.mappings.length} mappings`;
+  return recordAudit({
     ...next,
     ingestLog: [
       { at: now, kind: 'legacy' as const, message: `Legacy workbook: ${conv.bom.length} BOM lines, ${conv.schedule.length} schedule lines, ${conv.passports.length} cells, ${conv.mappings.length} mappings` },
       ...next.ingestLog,
     ].slice(0, 200),
-  };
+  }, 'Legacy workbook import', msg, { at: now });
 }

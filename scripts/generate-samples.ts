@@ -9,6 +9,7 @@ import { toCsv } from '../src/engine/csv';
 import { sampleDesResults } from '../src/engine/des';
 import { TARGET_FIELDS } from '../src/engine/importer';
 import { computeModel } from '../src/engine/model';
+import { sampleTxStats } from '../src/engine/tecnomatix';
 import { writeWorkbook } from '../src/engine/sheet';
 
 const out = join(process.cwd(), 'samples');
@@ -59,4 +60,9 @@ writeFileSync(
 
 // DES results to re-import.
 writeFileSync(join(out, 'des-results.csv'), toCsv(sampleDesResults(computeModel(state), state)));
+// Siemens Tecnomatix Plant Simulation statistics (fractions, as exported from a Plant Simulation statistics table).
+writeFileSync(
+  join(out, 'plantsim-statistics.csv'),
+  toCsv(sampleTxStats(computeModel(state), state).map((t) => ({ Object: t.objectPath, StatWorkingTime: (t.workingPct / 100).toFixed(4), StatBlockingTime: (t.blockingPct / 100).toFixed(4), StatWaitingTime: (t.waitingPct / 100).toFixed(4), StatThroughput: t.throughput ?? '' }))),
+);
 console.log(`Samples written to ${out}`);

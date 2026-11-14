@@ -41,11 +41,12 @@ import { SERVICE_KEYS, SERVICE_LABELS } from '../engine/settings';
 import type { FactoryId } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES, QUARTERS } from '../engine/types';
 import { useHub } from '../store/HubContext';
+import { statusBadgeTone } from '../components/Governance';
 
 type Tab = 'compare' | 'topology' | 'assets' | 'routes' | 'presets';
 
 export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { state, scenarios, newScenario, renameScenario, deleteScenario, promoteScenario, setDesSourceId } = useHub();
+  const { state, scenarios, newScenario, renameScenario, deleteScenario, promoteScenario, setDesSourceId, setScenarioStatus } = useHub();
   const [activeId, setActiveId] = useState<string | undefined>(scenarios[0]?.id);
   const [tab, setTab] = useState<Tab>('compare');
   useEffect(() => {
@@ -90,6 +91,7 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
             <button key={s.id} onClick={() => setActiveId(s.id)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${s.id === activeId ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
               <i className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: colourOf(s.id) }} />
               {s.name}
+              <span className="rounded bg-white/80 px-1 text-[10px] text-slate-700">{s.status ?? 'Draft'}</span>
               <span className="opacity-70">{s.log.length - 1} {s.log.length - 1 === 1 ? 'change' : 'changes'}</span>
             </button>
           ))}
@@ -104,13 +106,18 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
               </ul>
             </div>
             <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1 text-xs text-slate-600">Sign-off <Badge tone={statusBadgeTone(active.status ?? 'Draft')}>{active.status ?? 'Draft'}</Badge>{active.signedOffBy && <span className="text-[10px] text-slate-500">by {active.signedOffBy}</span>}</span>
+              {(active.status ?? 'Draft') === 'Draft' && <Button onClick={() => setScenarioStatus(active.id, 'Reviewed')}>Mark Reviewed</Button>}
+              {active.status === 'Reviewed' && <Button onClick={() => setScenarioStatus(active.id, 'Approved Baseline')}>Approve for Baseline</Button>}
+              {active.status && active.status !== 'Draft' && <Button variant="ghost" onClick={() => setScenarioStatus(active.id, 'Draft')}>Return to Draft</Button>}
               <Button onClick={() => { const n = prompt('Rename scenario', active.name); if (n) renameScenario(active.id, n); }}>Rename</Button>
               <Button onClick={() => { setDesSourceId(active.id); navigate({ ws: 'des' }); }}>→ Export to DES (Workspace 6)</Button>
               <Button variant="danger" onClick={() => confirm(`Delete scenario “${active.name}”?`) && deleteScenario(active.id)}>Delete</Button>
               <Button
                 variant="primary"
                 onClick={async () => {
-                  if (!confirm(`Promote “${active.name}” to Live Baseline?\n\nThe current live state is snapshotted to IndexedDB first (restore from ⟲ Snapshots).`)) return;
+                  const warn = active.status === 'Approved Baseline' ? '' : `\n\n⚠ This scenario is ${active.status ?? 'Draft'} (not Approved) — the new baseline will be Draft.`;
+                  if (!confirm(`Promote “${active.name}” to Live Baseline?\n\nThe current live state is snapshotted to IndexedDB first (restore from ⟲ Snapshots) and the promotion is recorded in the governance audit log.${warn}`)) return;
                   await promoteScenario(active.id);
                   alert(`“${active.name}” is now the Live Baseline. A snapshot of the previous live state was saved.`);
                 }}
@@ -363,7 +370,7 @@ function TopologyPanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation;
         </div>
         {p && (
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <div className="rounded border border-slate-200 p-2 text-xs"><div className="text-[10px] uppercase tracking-wide text-slate-500">Relocation CapEx</div><div className="text-base font-semibold">{fmtGbp(reloc)}</div><div className="text-[10px] text-slate-500">re-install + 5% rigging + £15k recommission</div></div>
+            <div className="rounded border border-slate-200 p-2 text-xs"><div className="text-[10px] uppercase tracking-wide text-slate-500">Relocation CapEx</div><div className="text-base font-semibold">{fmtGbp(reloc)}</div><div className="text-[10px] text-slate-500">re-install + {sc.state.settings.relocationRiggingPct}% rigging + {fmtGbp(sc.state.settings.recommissioningGbp)} recommission</div></div>
             <div className="rounded border border-slate-200 p-2 text-xs"><div className="text-[10px] uppercase tracking-wide text-slate-500">Replication CapEx</div><div className="text-base font-semibold">{fmtGbp(repl)}</div><div className="text-[10px] text-slate-500">new assets + install + tooling</div></div>
             <div className="rounded border border-slate-200 p-2 text-xs"><div className="text-[10px] uppercase tracking-wide text-slate-500">Relocate vs replicate</div><div className="text-base font-semibold">{repl > 0 ? `${((reloc / repl) * 100).toFixed(0)}%` : '—'}</div><div className="text-[10px] text-slate-500">relocation as a share of replication cost</div></div>
           </div>

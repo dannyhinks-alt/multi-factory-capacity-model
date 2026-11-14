@@ -1,3 +1,4 @@
+import { recordAudit } from './governance';
 import type { Asset, ColumnMappingProfile, ComplexityClass, FactoryId, Fixture, HubState, ImportTarget, SkillRole } from './types';
 import { FACTORIES } from './types';
 
@@ -269,5 +270,6 @@ export function importMasterRows(
     report = r.report;
   }
   const msg = `${target}: +${report.inserted} new, ${report.updated} updated, ${report.removed} removed, ${report.protectedKept} referenced kept (${mode})`;
-  return { state: { ...next, updatedAt: now, ingestLog: [{ at: now, kind: 'master' as const, message: msg }, ...state.ingestLog].slice(0, 200) }, report };
+  const logged = { ...next, updatedAt: now, ingestLog: [{ at: now, kind: 'master' as const, message: msg }, ...state.ingestLog].slice(0, 200) };
+  return { state: recordAudit(logged, 'Master Data import', msg, { at: now }), report };
 }

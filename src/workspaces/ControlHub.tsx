@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
 import { AuditPanel } from '../components/AuditPanel';
-import { Badge, Card, ConstraintTag, FactoryFilter, Meter, Stat, fmtGbp, fmtNum, fmtPct, statusTone, td, tdNum, th } from '../components/ui';
+import { IntegrityPanel } from '../components/Governance';
+import { STORE_TIERS } from '../engine/stores';
+import { Badge, Button, Card, ConstraintTag, FactoryFilter, Meter, Stat, fmtGbp, fmtNum, fmtPct, statusTone, td, tdNum, th } from '../components/ui';
 import { UtilChart } from '../components/UtilChart';
 import { factoryKpis } from '../engine/model';
 import { SERVICE_LABELS } from '../engine/settings';
 import type { FactoryId } from '../engine/types';
-import { FACTORY_NAMES } from '../engine/types';
+import { FACTORY_NAMES, STORE_TIER_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
 
 export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => void }) {
@@ -26,9 +28,10 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
         <div className="text-xs text-slate-500">{scope === 'All' ? `${k.cells} cells across F1–F4` : FACTORY_NAMES[scope]} · {fmtNum(k.annualOutput)} top Assemblies / yr scheduled</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Total CapEx" value={fmtGbp(k.totalCapexGbp)} sub={`Cells ${fmtGbp(k.cellCapexGbp)} + shared ${fmtGbp(k.sharedPlantCapexGbp)}`} />
-        <Stat label="Footprint" value={`${fmtNum(k.factoryFootprintM2)} m²`} sub={`Assets ${fmtNum(k.assetFootprintM2)} → cells ${fmtNum(k.cellFootprintM2)} m²`} />
+        <Stat label="Footprint" value={`${fmtNum(k.totalFootprintM2)} m²`} sub={`Cells ${fmtNum(k.factoryFootprintM2)} (incl. circulation) + stores ${fmtNum(k.storesFootprintM2)} m²`} />
+        <Stat label="Stores & WIP" value={fmtGbp(k.workingCapitalGbp)} sub={`Working capital · ${fmtNum(k.storesFootprintM2)} m² stores & buffers`} />
         <Stat label="Avg utilisation" value={fmtPct(k.avgUtilisationPct, 1)} tone={k.avgUtilisationPct >= s.bottleneckPct ? 'critical' : k.avgUtilisationPct >= s.nearLimitPct ? 'warning' : 'good'} sub="Demand-loaded cells" />
         <Stat label="OEE" value={fmtPct(k.avgOeePct, 1)} sub="Effective cell OEE" />
         <Stat label="TEEP" value={fmtPct(k.avgTeepPct, 1)} sub="OEE × loading" />
@@ -42,7 +45,7 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
           <UtilChart cells={cells} near={s.nearLimitPct} limit={s.bottleneckPct} onSelect={(id) => navigate({ ws: 'cells', cellId: id })} />
         </Card>
         <Card title="Footprint build-up" subtitle={`${s.footprintFixedM2} m² fixed + ${s.footprintVariablePct}% variable per cell, then ${s.circulationPct}% factory circulation`}>
-          <FootprintBars asset={k.assetFootprintM2} cell={k.cellFootprintM2} factory={k.factoryFootprintM2} />
+          <FootprintBars asset={k.assetFootprintM2} cell={k.cellFootprintM2} factory={k.factoryFootprintM2} stores={k.storesFootprintM2} />
           <div className="mt-4">
             <div className="mb-1 text-xs font-semibold text-slate-700">Process Cycle Efficiency (cycle minutes)</div>
             <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-sm" role="img" aria-label="PCE split">
@@ -113,16 +116,34 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
         </Card>
         <AuditPanel scope={scope} onCell={(id) => navigate({ ws: 'cells', cellId: id })} />
       </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <IntegrityPanel compact onOpen={() => navigate({ ws: 'master', tab: 'integrity' })} />
+        <Card title="Buffers, WIP & Stores" subtitle="RM stores · kitting · inter-cell WIP buffers · despatch staging" actions={<Button variant="ghost" onClick={() => navigate({ ws: 'services' })}>Open →</Button>}>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {STORE_TIERS.map((t) => {
+              const r = scope === 'All' ? model.stores.totals.tiers[t] : model.stores.byFactory[scope].tiers[t];
+              return (
+                <div key={t} className="rounded border border-slate-200 p-2 text-xs">
+                  <div className="truncate text-[11px] text-slate-500" title={STORE_TIER_NAMES[t]}>{STORE_TIER_NAMES[t]}</div>
+                  <div className="text-sm font-semibold tabular-nums">{fmtGbp(r.workingCapitalGbp)}</div>
+                  <div className="text-[11px] text-slate-500">{fmtNum(r.footprintM2)} m² · {fmtNum(r.locations)} loc.</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
     </>
   );
 }
 
-function FootprintBars({ asset, cell, factory }: { asset: number; cell: number; factory: number }) {
-  const max = Math.max(factory, 1);
+function FootprintBars({ asset, cell, factory, stores }: { asset: number; cell: number; factory: number; stores: number }) {
+  const max = Math.max(factory + stores, 1);
   const rows = [
     { label: 'Asset footprint', v: asset },
     { label: 'Cell envelope (+8 m² +20%)', v: cell },
     { label: 'Factory incl. 35% circulation', v: factory },
+    { label: '+ Stores, kitting, WIP & despatch', v: factory + stores },
   ];
   return (
     <div className="space-y-2">

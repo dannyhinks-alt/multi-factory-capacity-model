@@ -113,6 +113,20 @@ const L5_POOL: Record<string, string> = {
   'BO-ORING-VITON': 'O-Ring Set Viton (Bought-Out)',
 };
 
+/** L5 unit cost £ (per KG for raw material, per EA for bought-out) — drives Working Capital Tied Up. */
+const L5_COST: Record<string, number> = {
+  'RM-AL6082-BAR': 4.2,
+  'RM-S355-PLATE': 1.35,
+  'RM-EN24T-BAR': 3.1,
+  'RM-SS316-BAR': 7.8,
+  'RM-GJL250-CAST': 2.6,
+  'RM-S275-RHS': 1.6,
+  'BO-BRG-6205': 6.5,
+  'BO-SEAL-KIT': 18,
+  'BO-FAST-M12': 4.75,
+  'BO-ORING-VITON': 9.2,
+};
+
 const PROGRAMMES: ProgrammeDef[] = [
   { code: 'ATL', name: 'ATLAS', l1: 'Electro-Mechanical Actuator', modules: ['Drive Module', 'Housing Module', ''], l4Names: ['Output Shaft', 'Ball-Screw Nut Housing', 'Motor Flange', 'Gear Blank', 'End Cap', 'Trunnion Mount', 'Bearing Housing', 'Rod End'], rawMaterials: ['RM-EN24T-BAR', 'RM-AL6082-BAR', 'BO-BRG-6205', 'BO-FAST-M12', 'BO-SEAL-KIT'] },
   { code: 'BOR', name: 'BOREAS', l1: 'Hydraulic Pump Skid', modules: ['Pump Module', 'Manifold Module', ''], l4Names: ['Valve Block', 'Pump Shaft', 'Port Plate', 'Piston', 'Manifold Body', 'Adaptor Flange', 'Cover Plate', 'Spool'], rawMaterials: ['RM-SS316-BAR', 'RM-AL6082-BAR', 'BO-ORING-VITON', 'BO-FAST-M12', 'RM-S355-PLATE'] },
@@ -149,10 +163,10 @@ export function buildSeedBom(): { bom: BomLine[]; schedule: ScheduleLine[] } {
             const qty = nameIdx % 3 === 0 ? 2 : 1;
             bom.push({ lineId: l4, parentLineId: l3, partId: l4Part, description: p.l4Names[nameIdx], level: 4, programme: p.name, qtyPer: qty, scrapPct: 2 + Math.round(rng() * 30) / 10, leadTimeDays: 8 + Math.round(rng() * 12), makeBuy: 'Make', uom: 'EA' });
             const rm = p.rawMaterials[(nameIdx + k) % 3 === 2 ? 4 : nameIdx % 2];
-            bom.push({ lineId: id(), parentLineId: l4, partId: rm, description: L5_POOL[rm], level: 5, programme: p.name, qtyPer: rm.startsWith('RM') ? Math.round((0.6 + rng() * 2.4) * 10) / 10 : 1, scrapPct: rm.startsWith('RM') ? 5 : 0.5, leadTimeDays: rm.startsWith('RM') ? 21 + Math.round(rng() * 35) : 10 + Math.round(rng() * 20), makeBuy: 'Buy', uom: rm.startsWith('RM') ? 'KG' : 'EA' });
+            bom.push({ lineId: id(), parentLineId: l4, partId: rm, description: L5_POOL[rm], unitCostGbp: L5_COST[rm], level: 5, programme: p.name, qtyPer: rm.startsWith('RM') ? Math.round((0.6 + rng() * 2.4) * 10) / 10 : 1, scrapPct: rm.startsWith('RM') ? 5 : 0.5, leadTimeDays: rm.startsWith('RM') ? 21 + Math.round(rng() * 35) : 10 + Math.round(rng() * 20), makeBuy: 'Buy', uom: rm.startsWith('RM') ? 'KG' : 'EA' });
             if (nameIdx % 2 === 1) {
               const bo = p.rawMaterials[2 + (nameIdx % 2)];
-              bom.push({ lineId: id(), parentLineId: l4, partId: bo, description: L5_POOL[bo], level: 5, programme: p.name, qtyPer: 1 + (nameIdx % 3), scrapPct: 0.5, leadTimeDays: 14 + Math.round(rng() * 21), makeBuy: 'Buy', uom: 'EA' });
+              bom.push({ lineId: id(), parentLineId: l4, partId: bo, description: L5_POOL[bo], unitCostGbp: L5_COST[bo], level: 5, programme: p.name, qtyPer: 1 + (nameIdx % 3), scrapPct: 0.5, leadTimeDays: 14 + Math.round(rng() * 21), makeBuy: 'Buy', uom: 'EA' });
             }
           }
         });
@@ -611,16 +625,7 @@ export function buildSeedState(): HubState {
       const raw = d[k] / ratios[f][k];
       capacity[k] = k === 'craneTonnes' ? Math.max(5, Math.ceil(raw)) : Math.ceil(raw / 10) * 10;
     }
-    // Floor-space ceiling: cell envelopes (+8 m² fixed, +20%) plus 35% circulation, at a planned occupancy.
-    const cellsFp = passports
-      .filter((x) => x.factory === f)
-      .reduce((s, p) => {
-        const fp = p.assets.reduce((t, pa) => t + (assetById.get(pa.assetId)?.footprintM2 ?? 12) * pa.qty, 0);
-        return s + (fp > 0 ? fp * (1 + settings.footprintVariablePct / 100) + settings.footprintFixedM2 : 0);
-      }, 0);
-    const occupancy: Record<FactoryId, number> = { F1: 0.84, F2: 0.9, F3: 0.94, F4: 0.7 };
-    const floorAreaM2 = Math.ceil((cellsFp * (1 + settings.circulationPct / 100)) / occupancy[f] / 50) * 50;
-    return { factory: f, capacity, sharedPlant: sharedPlant[f], floorAreaM2 };
+    return { factory: f, capacity, sharedPlant: sharedPlant[f], floorAreaM2: 0 };
   });
 
   const state: HubState = {
@@ -642,6 +647,21 @@ export function buildSeedState(): HubState {
     updatedAt: now,
   };
   // Baseline DES round-trip so the validation workspace shows AGREE / DISAGREE out of the box.
-  state.desResults = sampleDesResults(computeModel(state), state);
+  const model = computeModel(state);
+  // Floor-space ceilings: cells (+8 m², +20%, ×1.35 circulation) plus stores & buffers, at a planned occupancy.
+  const occupancy: Record<FactoryId, number> = { F1: 0.84, F2: 0.9, F3: 0.94, F4: 0.7 };
+  for (const u of state.utilities) {
+    const cellsFp = model.cells.filter((c) => c.factory === u.factory).reduce((t, c) => t + c.totalFootprintM2, 0) * (1 + settings.circulationPct / 100);
+    u.floorAreaM2 = Math.ceil((cellsFp + model.stores.byFactory[u.factory].footprintM2) / occupancy[u.factory] / 50) * 50;
+  }
+  state.desResults = sampleDesResults(model, state);
+  state.governance = {
+    major: 1,
+    minor: 0,
+    status: 'Approved Baseline',
+    currentUser: 'Planner',
+    auditLog: [{ id: 'aud-seed', at: now, action: 'Baseline created', actor: 'System', versionFrom: '—', versionTo: 'v1.0', status: 'Approved Baseline', details: `F1–F4 baseline: ${passports.length} Cell Passports, ${bom.length} BOM lines, ${mappings.length} mappings` }],
+  };
+  state.tecnomatixStats = [];
   return state;
 }

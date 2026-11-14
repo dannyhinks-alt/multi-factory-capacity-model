@@ -5,6 +5,7 @@ import { SERVICE_KEYS, SERVICE_LABELS } from '../engine/settings';
 import type { FactoryId, SharedPlantItem } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
+import { StoresPanel } from '../components/StoresPanel';
 
 export default function ServicesSpecifier({ focusCell }: { focusCell?: string }) {
   const { model, state } = useHub();
@@ -76,6 +77,7 @@ export default function ServicesSpecifier({ focusCell }: { focusCell?: string })
       <div className="grid gap-4 2xl:grid-cols-2">
         {FACTORIES.map((f) => <FactoryBalance key={f} factory={f} />)}
       </div>
+      <StoresPanel />
     </>
   );
 }
