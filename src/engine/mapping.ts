@@ -1,6 +1,6 @@
 import type { BomExplosion } from './bom';
 import type { RouteDemand } from './rollup';
-import type { CellPassport, RouteMapping } from './types';
+import type { CellPassport, RouteMapping, Subcontract } from './types';
 
 /** Normalise an identifier for matching: upper-case alphanumerics only. */
 export function normaliseId(s: string): string {
@@ -146,19 +146,24 @@ export const routeKey = (cellId: string, routeId: string) => `${cellId}::${route
 
 /**
  * Push exploded BOM gross demand through the mapping table onto each `Cell → Route` slot.
+ * Dual-source mappings carry `sharePct`; subcontracted (bought-in) share is removed before loading cells.
  */
-export function demandByRoute(mappings: RouteMapping[], explosion: BomExplosion): Map<string, RouteDemand> {
+export function demandByRoute(mappings: RouteMapping[], explosion: BomExplosion, subcontracts: Subcontract[] = []): Map<string, RouteDemand> {
   const out = new Map<string, RouteDemand>();
+  const offload = new Map(subcontracts.map((s) => [s.bomPartId, Math.min(100, Math.max(0, s.pct)) / 100]));
   for (const m of mappings) {
     const d = explosion.demandByPart.get(m.bomPartId);
     if (!d) continue;
+    // Dual-source share × in-house (non-subcontracted) fraction.
+    const f = ((m.sharePct ?? 100) / 100) * (1 - (offload.get(m.bomPartId) ?? 0));
+    if (f <= 0) continue;
     const key = routeKey(m.cellId, m.routeId);
     const cur = out.get(key) ?? { annual: 0, byQuarter: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }, bomParts: [] };
-    cur.annual += d.annual;
-    cur.byQuarter.Q1 += d.byQuarter.Q1;
-    cur.byQuarter.Q2 += d.byQuarter.Q2;
-    cur.byQuarter.Q3 += d.byQuarter.Q3;
-    cur.byQuarter.Q4 += d.byQuarter.Q4;
+    cur.annual += d.annual * f;
+    cur.byQuarter.Q1 += d.byQuarter.Q1 * f;
+    cur.byQuarter.Q2 += d.byQuarter.Q2 * f;
+    cur.byQuarter.Q3 += d.byQuarter.Q3 * f;
+    cur.byQuarter.Q4 += d.byQuarter.Q4 * f;
     cur.bomParts.push(m.bomPartId);
     out.set(key, cur);
   }

@@ -1,9 +1,14 @@
 import type { HubState } from '../engine/types';
+import type { Scenario } from '../engine/scenario';
 import { DEFAULT_DICTIONARY } from '../engine/settings';
 
 export const DB_NAME = 'multi-factory-hub-v1';
 const STATE_STORE = 'state';
 const SNAP_STORE = 'snapshots';
+const SCENARIO_STORE = 'scenarios';
+const LS_SCENARIOS = 'multi-factory-hub-v1:scenarios';
+/** v2 adds the `scenarios` store (Workspace 7). */
+const DB_VERSION = 2;
 const LS_STATE = 'multi-factory-hub-v1:state';
 const LS_SNAPS = 'multi-factory-hub-v1:snapshots';
 export const MAX_SNAPSHOTS = 5;
@@ -19,11 +24,12 @@ function openDb(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
     try {
       if (typeof indexedDB === 'undefined') return resolve(null);
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STATE_STORE)) db.createObjectStore(STATE_STORE);
         if (!db.objectStoreNames.contains(SNAP_STORE)) db.createObjectStore(SNAP_STORE, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(SCENARIO_STORE)) db.createObjectStore(SCENARIO_STORE, { keyPath: 'id' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
@@ -75,7 +81,7 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     desResults: r.desResults ?? [],
     mappingProfiles: r.mappingProfiles ?? fallback.mappingProfiles,
     ingestLog: r.ingestLog ?? [],
-    utilities: r.utilities ?? fallback.utilities,
+    utilities: (r.utilities ?? fallback.utilities).map((u) => ({ ...u, floorAreaM2: u.floorAreaM2 ?? fallback.utilities.find((f) => f.factory === u.factory)?.floorAreaM2 })),
   } as HubState;
 }
 
@@ -145,12 +151,57 @@ export async function pushSnapshot(state: HubState, label: string): Promise<Snap
   return snaps;
 }
 
+// ---------------------------------------------------------------- scenarios (Workspace 7)
+
+/** Load every saved scenario (IndexedDB, else localStorage). */
+export async function loadScenarios(): Promise<Scenario[]> {
+  const db = await openDb();
+  if (db) {
+    try {
+      const all = await tx<Scenario[]>(db, SCENARIO_STORE, 'readonly', (s) => s.getAll());
+      if (all) return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    } catch {
+      /* fall through */
+    }
+  }
+  return lsGet<Scenario[]>(LS_SCENARIOS) ?? [];
+}
+
+/** Upsert one scenario. */
+export async function saveScenario(sc: Scenario): Promise<void> {
+  const db = await openDb();
+  if (db) {
+    try {
+      await tx(db, SCENARIO_STORE, 'readwrite', (s) => s.put(sc));
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  const all = (lsGet<Scenario[]>(LS_SCENARIOS) ?? []).filter((x) => x.id !== sc.id);
+  lsSet(LS_SCENARIOS, [...all, sc]);
+}
+
+export async function deleteScenarioStore(id: string): Promise<void> {
+  const db = await openDb();
+  if (db) {
+    try {
+      await tx(db, SCENARIO_STORE, 'readwrite', (s) => s.delete(id));
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  lsSet(LS_SCENARIOS, (lsGet<Scenario[]>(LS_SCENARIOS) ?? []).filter((x) => x.id !== id));
+}
+
 export async function clearAll(): Promise<void> {
   const db = await openDb();
   if (db) {
     try {
       await tx(db, STATE_STORE, 'readwrite', (s) => s.clear());
       await tx(db, SNAP_STORE, 'readwrite', (s) => s.clear());
+      await tx(db, SCENARIO_STORE, 'readwrite', (s) => s.clear());
     } catch {
       /* ignore */
     }

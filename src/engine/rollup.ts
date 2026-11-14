@@ -61,6 +61,8 @@ export interface ResourceUtilisation {
   loadMin: number;
   utilisationPct: number;
   peakQuarterPct: number;
+  /** Utilisation % per quarter Q1–Q4 (quarter capacity = annual ÷ 4). */
+  byQuarterPct: number[];
 }
 
 export type CellStatus = 'Bottleneck' | 'Near limit' | 'Healthy' | 'Idle';
@@ -227,9 +229,9 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
   let oeeWeight = 0;
   for (const [assetId, load] of Object.entries(assetLoad)) {
     const a = assetById.get(assetId);
-    const qty = a?.qty ?? 1;
+    const qty = a ? a.qty : 0; // asset not present in the cell → starved (zero machine capacity)
     const oee = (a?.oeePct ?? ctx.settings.complexityPct.C) / 100;
-    const perMachineCycle = (assetCycle[assetId] ?? 0) / Math.max(qty, 1);
+    const perMachineCycle = qty > 0 ? (assetCycle[assetId] ?? 0) / qty : assetCycle[assetId] ?? 0;
     if (perMachineCycle > bottleneckCycle) {
       bottleneckCycle = perMachineCycle;
       bottleneckAsset = assetId;
@@ -320,18 +322,16 @@ export function rollUpCell(
   // --- Resource utilisation (demand-weighted across every route in the cell)
   const resources: ResourceUtilisation[] = [];
   const la = settings.labourAvailabilityPct / 100;
-  const quarterPeak = (perUnit: (r: RouteMacroBlock) => number, capacity: number) => {
-    let peak = 0;
-    for (const q of ['Q1', 'Q2', 'Q3', 'Q4'] as const) {
+  const quarterPcts = (perUnit: (r: RouteMacroBlock) => number, capacity: number) =>
+    (['Q1', 'Q2', 'Q3', 'Q4'] as const).map((q) => {
       const load = routes.reduce((s, r) => s + r.demand.byQuarter[q] * perUnit(r), 0);
-      peak = Math.max(peak, capacity > 0 ? (load / (capacity / 4)) * 100 : load > 0 ? Infinity : 0);
-    }
-    return peak;
-  };
+      return capacity > 0 ? (load / (capacity / 4)) * 100 : load > 0 ? Infinity : 0;
+    });
   const pushRes = (kind: ConstraintKind, id: string, label: string, capacity: number, perUnit: (r: RouteMacroBlock) => number) => {
     const load = routes.reduce((s, r) => s + r.demand.annual * perUnit(r), 0);
     const used = routes.some((r) => perUnit(r) > 0);
     if (!used) return;
+    const byQuarterPct = quarterPcts(perUnit, capacity);
     resources.push({
       kind,
       id,
@@ -339,12 +339,16 @@ export function rollUpCell(
       capacityMin: capacity,
       loadMin: load,
       utilisationPct: capacity > 0 ? (load / capacity) * 100 : load > 0 ? Infinity : 0,
-      peakQuarterPct: quarterPeak(perUnit, capacity),
+      peakQuarterPct: Math.max(0, ...byQuarterPct),
+      byQuarterPct,
     });
   };
   for (const a of assets) {
     pushRes('Machine', a.assetId, a.description, a.qty * availMin * (a.oeePct / 100), (r) => r.assetLoad[a.assetId] ?? 0);
   }
+  // Ops still referencing an asset no longer in the cell (e.g. reassigned away) are starved: zero capacity.
+  const missingAssets = new Set(routes.flatMap((r) => Object.keys(r.assetLoad)).filter((id) => !assets.some((a) => a.assetId === id)));
+  for (const id of missingAssets) pushRes('Machine', id, `${id} (missing — starved)`, 0, (r) => r.assetLoad[id] ?? 0);
   const skills = new Set(routes.flatMap((r) => Object.keys(r.skillLoad)));
   for (const s of skills) {
     pushRes('Labour', s, `${s} (${heads[s] ?? 0} competent)`, (heads[s] ?? 0) * availMin * la, (r) => r.skillLoad[s] ?? 0);

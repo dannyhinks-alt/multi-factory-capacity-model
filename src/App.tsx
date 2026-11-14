@@ -8,9 +8,10 @@ import CellsExplorer from './workspaces/CellsExplorer';
 import ServicesSpecifier from './workspaces/ServicesSpecifier';
 import MasterData from './workspaces/MasterData';
 import DesExport from './workspaces/DesExport';
+import ScenarioPlanner from './workspaces/ScenarioPlanner';
 import { buildSeedState } from './data/seed';
 
-export type WorkspaceId = 'hub' | 'bom' | 'cells' | 'services' | 'master' | 'des';
+export type WorkspaceId = 'hub' | 'bom' | 'cells' | 'services' | 'master' | 'des' | 'scenarios';
 
 const WORKSPACES: { id: WorkspaceId; n: number; label: string; short: string }[] = [
   { id: 'hub', n: 1, label: 'Factory Control Hub', short: 'Executive dashboard' },
@@ -19,6 +20,7 @@ const WORKSPACES: { id: WorkspaceId; n: number; label: string; short: string }[]
   { id: 'services', n: 4, label: 'Facility & Cell Services', short: 'kW, air, extraction, cranes' },
   { id: 'master', n: 5, label: 'Master Data & Workforce', short: 'Catalogues, importers, skills' },
   { id: 'des', n: 6, label: 'Plant Simulation / DES', short: 'Export & validation' },
+  { id: 'scenarios', n: 7, label: 'Scenario Planner & Cause-Effect', short: 'What-if layouts, presets, diagnostics' },
 ];
 
 export interface NavTarget {
@@ -147,6 +149,7 @@ export default function App() {
           {ws === 'services' && <ServicesSpecifier focusCell={focusCell} />}
           {ws === 'master' && <MasterData />}
           {ws === 'des' && <DesExport navigate={navigate} />}
+          {ws === 'scenarios' && <ScenarioPlanner navigate={navigate} />}
         </main>
       </div>
     </div>

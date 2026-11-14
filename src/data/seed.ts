@@ -611,7 +611,16 @@ export function buildSeedState(): HubState {
       const raw = d[k] / ratios[f][k];
       capacity[k] = k === 'craneTonnes' ? Math.max(5, Math.ceil(raw)) : Math.ceil(raw / 10) * 10;
     }
-    return { factory: f, capacity, sharedPlant: sharedPlant[f] };
+    // Floor-space ceiling: cell envelopes (+8 m² fixed, +20%) plus 35% circulation, at a planned occupancy.
+    const cellsFp = passports
+      .filter((x) => x.factory === f)
+      .reduce((s, p) => {
+        const fp = p.assets.reduce((t, pa) => t + (assetById.get(pa.assetId)?.footprintM2 ?? 12) * pa.qty, 0);
+        return s + (fp > 0 ? fp * (1 + settings.footprintVariablePct / 100) + settings.footprintFixedM2 : 0);
+      }, 0);
+    const occupancy: Record<FactoryId, number> = { F1: 0.84, F2: 0.9, F3: 0.94, F4: 0.7 };
+    const floorAreaM2 = Math.ceil((cellsFp * (1 + settings.circulationPct / 100)) / occupancy[f] / 50) * 50;
+    return { factory: f, capacity, sharedPlant: sharedPlant[f], floorAreaM2 };
   });
 
   const state: HubState = {

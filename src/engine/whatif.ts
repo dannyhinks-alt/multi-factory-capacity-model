@@ -1,5 +1,6 @@
 import { explodeBom } from './bom';
 import { demandByRoute } from './mapping';
+import { applyMacroOverrides } from './model';
 import { rollUpCell, type CellMacroBlock, type RouteDemand } from './rollup';
 import type { CellPassport, HubState } from './types';
 
@@ -31,9 +32,9 @@ export interface WhatIfContext {
 
 /** Prepare a reusable context (BOM explosion + route demand) for repeated What-If evaluations. */
 export function whatIfContext(state: HubState, cellId: string): WhatIfContext | null {
-  const p = state.passports.find((x) => x.cellId === cellId);
+  const p = applyMacroOverrides(state.passports, state.macroOverrides).find((x) => x.cellId === cellId);
   if (!p) return null;
-  const routeDemand = demandByRoute(state.mappings, explodeBom(state.bom, state.schedule));
+  const routeDemand = demandByRoute(state.mappings, explodeBom(state.bom, state.schedule), state.subcontracts);
   const baseline = evaluate(state, p, routeDemand);
   return { state, routeDemand, baseline };
 }
@@ -78,7 +79,7 @@ export function applyLevers(p: CellPassport, levers: WhatIfLevers, baseline: Cel
  */
 export function evaluateWhatIf(ctx: WhatIfContext, cellId: string, levers: WhatIfLevers, targetPct: number, horizonYears = 3): WhatIfResult {
   const { state } = ctx;
-  const p = state.passports.find((x) => x.cellId === cellId)!;
+  const p = applyMacroOverrides(state.passports, state.macroOverrides).find((x) => x.cellId === cellId)!;
   const modified = applyLevers(p, levers, ctx.baseline);
   const cell = evaluate(state, modified, ctx.routeDemand);
   const topMachine = ctx.baseline.resources.find((r) => r.kind === 'Machine');
@@ -113,7 +114,7 @@ export function evaluateWhatIf(ctx: WhatIfContext, cellId: string, levers: WhatI
 export function solveWhatIf(state: HubState, cellId: string, targetPct = 85, horizonYears = 3, limit = 5): WhatIfResult[] {
   const ctx = whatIfContext(state, cellId);
   if (!ctx) return [];
-  const p = state.passports.find((x) => x.cellId === cellId)!;
+  const p = applyMacroOverrides(state.passports, state.macroOverrides).find((x) => x.cellId === cellId)!;
   const hasTool = ctx.baseline.resources.some((r) => r.kind === 'Tooling');
   const hasLabour = ctx.baseline.resources.some((r) => r.kind === 'Labour');
   const results: WhatIfResult[] = [];
