@@ -22,3 +22,19 @@ describe('Offline persistence (IndexedDB multi-factory-hub-v1)', () => {
     expect(() => parseBackup('{"foo":1}', seed)).toThrow();
   });
 });
+
+import { deleteScenarioStore, loadScenarios, saveScenario } from '../src/store/persistence';
+import { createScenario } from '../src/engine/scenario';
+
+describe('Scenario store (IndexedDB v2)', () => {
+  it('saves, lists and deletes scenarios', async () => {
+    const seed = buildSeedState();
+    const a = createScenario(seed, 'Scenario A');
+    const b = createScenario(seed, 'Scenario B');
+    await saveScenario(a);
+    await saveScenario(b);
+    expect((await loadScenarios()).map((s) => s.name)).toEqual(['Scenario A', 'Scenario B']);
+    await deleteScenarioStore(a.id);
+    expect((await loadScenarios()).map((s) => s.name)).toEqual(['Scenario B']);
+  });
+});

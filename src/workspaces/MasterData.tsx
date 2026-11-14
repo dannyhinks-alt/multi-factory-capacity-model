@@ -645,6 +645,8 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           {num('Utility amber threshold', 'utilityAmberPct', '%')}
           {num('DES AGREE tolerance (± pp)', 'desTolerancePct', 'pp')}
           {num('DES buffer queue limit', 'desBufferLimit', 'units')}
+          {num('Contribution margin per top Assembly (scenario payback)', 'contributionMarginGbp', '£')}
+          {num('Depreciation period (unit conversion cost)', 'depreciationYears', 'yrs')}
         </>
       )}
     </div>

@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
-import { Badge, Button, Card, DropZone, FactoryFilter, Stat, download, fmtNum, fmtPct, td, tdNum, th } from '../components/ui';
+import { Badge, Button, Card, DropZone, FactoryFilter, Stat, download, fmtNum, fmtPct, input, td, tdNum, th } from '../components/ui';
+import { computeModel } from '../engine/model';
+import { LIVE_ID } from '../engine/scenario';
 import { toCsv } from '../engine/csv';
 import { buildDesRouting, buildDesSchedule, compareDes, parseDesResults, sampleDesResults } from '../engine/des';
 import type { DesResult, FactoryId } from '../engine/types';
 import { useHub } from '../store/HubContext';
 
 export default function DesExport({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { model, state, update } = useHub();
+  const { model: liveModel, state: liveState, update, scenarios, desSourceId, setDesSourceId } = useHub();
+  const source = scenarios.find((s) => s.id === desSourceId);
+  // Any Workspace 7 scenario can be exported straight into the DES tables without touching live data.
+  const model = useMemo(() => (source ? computeModel(source.state) : liveModel), [source, liveModel]);
+  const state = source ? { ...source.state, desResults: liveState.desResults } : liveState;
   const [scope, setScope] = useState<FactoryId | 'All'>('All');
   const [msg, setMsg] = useState('');
   const routing = useMemo(() => buildDesRouting(model).filter((r) => scope === 'All' || r.factory === scope), [model, scope]);
@@ -17,7 +23,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
   const agree = comparison.filter((c) => c.verdict === 'AGREE').length;
   const buffers = comparison.filter((c) => c.bufferAlert).length;
   const stamp = new Date().toISOString().slice(0, 10);
-  const suffix = scope === 'All' ? 'all-plants' : scope;
+  const suffix = `${source ? `${source.name.replace(/[^A-Za-z0-9]+/g, '-')}-` : ''}${scope === 'All' ? 'all-plants' : scope}`;
 
   const importResults = async (files: File[]) => {
     const all: DesResult[] = [];
@@ -36,7 +42,17 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <FactoryFilter value={scope} onChange={setScope} />
+        <div className="flex flex-wrap items-center gap-3">
+          <FactoryFilter value={scope} onChange={setScope} />
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            Source
+            <select className={input} value={source ? source.id : LIVE_ID} onChange={(e) => setDesSourceId(e.target.value)}>
+              <option value={LIVE_ID}>Live Baseline</option>
+              {scenarios.map((s) => <option key={s.id} value={s.id}>Scenario: {s.name}</option>)}
+            </select>
+          </label>
+          {source && <Badge tone="info">Exporting scenario “{source.name}” — live data untouched</Badge>}
+        </div>
         <div className="text-xs text-slate-500">Analytic utilisation tolerance ± {state.settings.desTolerancePct} pp · buffer limit {state.settings.desBufferLimit}</div>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

@@ -2,7 +2,7 @@ import { ancestorsOf, explodeBom, type BomExplosion } from './bom';
 import { demandByRoute, routeKey } from './mapping';
 import { factoryFootprint, rollUpCell, type CellMacroBlock } from './rollup';
 import { addServices, SERVICE_KEYS, ZERO_SERVICES } from './settings';
-import type { FactoryId, HubState, RouteMapping, ServiceVector } from './types';
+import type { CellPassport, FactoryId, HubState, RouteMapping, ServiceVector } from './types';
 import { FACTORIES } from './types';
 
 export type BomFlag = 'Bottleneck' | 'Cascade' | 'Gate Blocked' | null;
@@ -88,25 +88,71 @@ export interface HubModel {
  * Build the full derived model from persisted state:
  * BOM explosion → mapped route demand → Cell Macro-Blocks → cascade flags, audit and services balance.
  */
+/**
+ * Apply folded Macro-Block overrides by re-scaling the route's micro-ops so the re-fold reproduces
+ * the overridden Rolled-Up Setup / Bottleneck Cycle / batch size (micro and macro views stay consistent).
+ */
+export function applyMacroOverrides(passports: CellPassport[], overrides: HubState['macroOverrides']): CellPassport[] {
+  if (!overrides || !Object.keys(overrides).length) return passports;
+  return passports.map((p) => {
+    if (!p.routes.some((r) => overrides[routeKey(p.cellId, r.routeId)])) return p;
+    const qtyOf = new Map(p.assets.map((a) => [a.assetId, a.qty]));
+    return {
+      ...p,
+      routes: p.routes.map((r) => {
+        const o = overrides[routeKey(p.cellId, r.routeId)];
+        if (!o) return r;
+        let ops = r.ops;
+        if (o.setupMin !== undefined) {
+          const total = ops.reduce((s, x) => s + x.setupMin, 0);
+          if (total > 0) ops = ops.map((x) => ({ ...x, setupMin: (x.setupMin * o.setupMin!) / total }));
+        }
+        if (o.cycleMin !== undefined) {
+          const perAsset = new Map<string, number>();
+          for (const x of ops) if (x.assetId) perAsset.set(x.assetId, (perAsset.get(x.assetId) ?? 0) + x.cycleMin);
+          let bn = 0;
+          for (const [id, c] of perAsset) bn = Math.max(bn, c / Math.max(1, qtyOf.get(id) ?? 1));
+          if (!perAsset.size) bn = Math.max(0, ...ops.map((x) => x.cycleMin));
+          if (bn > 0) {
+            const k = o.cycleMin / bn;
+            ops = ops.map((x) => ({ ...x, cycleMin: x.cycleMin * k, labourMin: x.labourMin !== undefined ? x.labourMin * k : undefined }));
+          }
+        }
+        return { ...r, ops, batchSize: o.batchSize ?? r.batchSize };
+      }),
+    };
+  });
+}
+
 export function computeModel(state: HubState): HubModel {
   const explosion = explodeBom(state.bom, state.schedule);
-  const routeDemand = demandByRoute(state.mappings, explosion);
+  const routeDemand = demandByRoute(state.mappings, explosion, state.subcontracts);
+  const passports = applyMacroOverrides(state.passports, state.macroOverrides);
   const assetMap = new Map(state.assets.map((a) => [a.assetId, a]));
   const fixtureMap = new Map(state.fixtures.map((f) => [f.toolingId, f]));
   const roleRates = new Map(state.skills.map((s) => [s.roleId, s.hourlyRateGbp]));
-  const cells = state.passports.map((p) => rollUpCell(p, assetMap, fixtureMap, state.settings, routeDemand, roleRates));
+  const cells = passports.map((p) => rollUpCell(p, assetMap, fixtureMap, state.settings, routeDemand, roleRates));
   const cellById = new Map(cells.map((c) => [c.cellId, c]));
-  const mapByPart = new Map(state.mappings.map((m) => [m.bomPartId, m]));
+  // Primary mapping per part = largest dual-source share; all shares are checked for bottleneck flags.
+  const mapByPart = new Map<string, RouteMapping>();
+  const allByPart = new Map<string, RouteMapping[]>();
+  for (const m of state.mappings) {
+    allByPart.set(m.bomPartId, [...(allByPart.get(m.bomPartId) ?? []), m]);
+    const cur = mapByPart.get(m.bomPartId);
+    if (!cur || (m.sharePct ?? 100) > (cur.sharePct ?? 100)) mapByPart.set(m.bomPartId, m);
+  }
 
   // --- Cascade bottleneck flags on BOM lines
   const lineStatus = new Map<string, BomLineStatus>();
   for (const l of explosion.lines) {
     const mapping = mapByPart.get(l.partId) ?? null;
     const cell = mapping ? cellById.get(mapping.cellId) ?? null : null;
+    const linked = (allByPart.get(l.partId) ?? []).map((m) => cellById.get(m.cellId)).filter((c): c is CellMacroBlock => !!c);
     let flag: BomFlag = null;
-    if (cell?.gateStatus === 'BLOCKED') flag = 'Gate Blocked';
-    else if (cell?.status === 'Bottleneck') flag = 'Bottleneck';
-    lineStatus.set(l.lineId, { mapping, cell, flag, flagSource: flag ? cell!.cellId : null });
+    let src: CellMacroBlock | undefined = linked.find((c) => c.gateStatus === 'BLOCKED');
+    if (src) flag = 'Gate Blocked';
+    else if ((src = linked.find((c) => c.status === 'Bottleneck'))) flag = 'Bottleneck';
+    lineStatus.set(l.lineId, { mapping, cell, flag, flagSource: flag ? src!.cellId : null });
   }
   for (const l of explosion.lines) {
     const st = lineStatus.get(l.lineId)!;

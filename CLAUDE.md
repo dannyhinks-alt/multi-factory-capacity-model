@@ -17,7 +17,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
 4. **Smart Legacy Workbook Importer:**
    - Offline column-mapping wizard for legacy capacity/BOM Excel files with safe Dictionary defaults (`48` weeks/yr, `82%` labour availability, Complexity `90/80/70/60/50%`, Fixture flag `80%`).
 
-## 3. Core Functional Workspaces (6 Focused Views)
+## 3. Core Functional Workspaces (7 Focused Views)
 1. **Factory Control Hub (Executive Dashboard):**
    - Factory filter (`All Plants` / `F1` / `F2` / `F3` / `F4`), Total CapEx (`£`), Footprint (`m²` including `8 m²` fixed + `20%` variable cell uplift & `35%` factory circulation), Average Utilisation, OEE, TEEP, PCE (`VA / NVA / ENVA`), Bottleneck/Blocked Cells, and the **Micro-vs-Macro Ingestion Audit**.
 2. **5-Level BOM & Master Schedule (`L1 → L5`):**
@@ -33,7 +33,16 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
 6. **Plant Simulation / DES Export & Validation:**
    - Exports a clean, flat **Plant Simulation / DES Routing & Schedule Table (`CSV` / `JSON`)** using the folded **Macro-Operations** (collapsing thousands of micro-steps into clean simulation blocks), plus DES result re-import (`AGREE` vs. `DISAGREE` flags and buffer queue monitoring).
 
+7. **Static Scenario Planner & Cause-Effect Studio (V1.1):**
+   - **Non-destructive scenario engine (copy-on-write):** clone the Live Baseline (or any scenario) into named scenarios (Baseline vs Scenario A/B/C…) stored in the IndexedDB `scenarios` store (DB version 2). Live ingested Cell Passports are never mutated; **Promote Scenario to Live Baseline** asks for confirmation and takes an automatic IndexedDB snapshot first.
+   - **Cell vs. Cells (Topology & Layout):** move, clone (replicate with % dual-source), merge or decommission cells across `F1–F4`; footprint (`8 m²` fixed + `20%` + `35%` circulation) vs per-factory floor-area ceilings, utility demand vs plant ceilings, and **Relocation vs Replication CapEx (£)**.
+   - **Asset vs. Asset Load:** reassign machines between cells (same-category units join as parallel machines; ops left without their machine are starved), **Asset Load Heatmap** (% of available shift hours, Q1–Q4 + annual, Baseline / Scenario / Δ) and Binding Capacity Cap re-check.
+   - **Route vs. Route:** edit micro-ops, split a bottleneck op across 2 machines, trim setup/cycle, batch size, tooling dwell/sets, override folded Macro-Blocks directly (micro-ops re-scaled so the re-fold matches), alternate BOM ↔ Cell Route assignments with **% dual-source splits** and Make-vs-Buy subcontracting.
+   - **One-click stress-test presets:** SMED −50% setup / batch halving; 2→3 shifts, overtime, key Level-3 operator absence (Skill ≥ 2 rule); +20% / +35% Programme surge, Q4→Q2 launch pull-forward; "Bad Week" −8% OEE / +3% scrap; Make-vs-Buy subcontract offload (CapEx avoided vs piece-part £).
+   - **Side-by-side comparison matrix** (Throughput, Utilisation %, Bottleneck count, Peak-quarter overloads, CapEx £, Incremental investment, Unit Conversion Cost £, Payback years, Footprint m², Utility & space overruns, OEE, TEEP, PCE) with delta badges, plus the automated **"Key Effects & Possible Causes"** diagnostic chain (binding-constraint shifts, L2–L5 scrap/material ripple, schedule changes, F1–F4 utility/space threshold triggers, gate changes, cost drivers).
+   - Export the comparison report (`.csv` / `.json` / print-friendly HTML) and send any scenario straight into Workspace 6 (DES Export) via its source selector.
+
 ## 4. Data Safety & Offline Single-File Build
-- Persist state + rolling 5 auto-snapshots in `IndexedDB` (`multi-factory-hub-v1`) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
+- Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
 - Include `README.md`, JSDoc comments on core calculation functions, and `.github/workflows/ci.yml`.
 - Bundle everything locally with zero external CDNs (`npm run build:offline` → `dist-offline/index.html`) and force-add `dist-offline/index.html` to Git.

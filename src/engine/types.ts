@@ -182,8 +182,36 @@ export interface RouteMapping {
   cellId: string;
   routeId: string;
   variantId: string;
-  source: 'auto' | 'manual' | 'legacy';
+  source: 'auto' | 'manual' | 'legacy' | 'scenario';
   updatedAt: string;
+  /** Share of the part's demand routed here (dual-source splits). Default 100%. */
+  sharePct?: number;
+}
+
+/** Make-vs-Buy subcontract offload of a BOM part (scenario lever). */
+export interface Subcontract {
+  bomPartId: string;
+  /** Share of the part's gross demand bought in rather than made. */
+  pct: number;
+  /** Bought-in unit piece-part price £. */
+  piecePriceGbp: number;
+  note?: string;
+}
+
+/** Direct override of a folded Macro-Block (applied by re-scaling its micro-ops before re-folding). */
+export interface MacroOverride {
+  setupMin?: number;
+  cycleMin?: number;
+  batchSize?: number;
+}
+
+/** One-off CapEx (£) or recurring cost (£/yr) adjustment recorded by a scenario operation. */
+export interface CostAdjustment {
+  id: string;
+  label: string;
+  kind: 'Relocation' | 'Replication' | 'Merge' | 'Decommission' | 'Tooling' | 'Overtime' | 'Other';
+  capexGbp: number;
+  opexGbpPerYear: number;
 }
 
 export interface SharedPlantItem {
@@ -198,6 +226,8 @@ export interface SharedPlantItem {
 export interface FactoryUtilities {
   factory: FactoryId;
   capacity: ServiceVector;
+  /** Usable floor-space ceiling (m²) for the factory, compared against footprint incl. circulation. */
+  floorAreaM2?: number;
   sharedPlant: SharedPlantItem[];
 }
 
@@ -225,6 +255,10 @@ export interface Dictionary {
   utilityAmberPct: number;
   desTolerancePct: number;
   desBufferLimit: number;
+  /** Contribution margin per top Assembly £ — used for scenario payback. */
+  contributionMarginGbp: number;
+  /** Straight-line depreciation period (years) for unit conversion cost. */
+  depreciationYears: number;
 }
 
 export interface ColumnMappingProfile {
@@ -237,7 +271,7 @@ export type ImportTarget = 'assets' | 'fixtures' | 'skills';
 
 export interface IngestLogEntry {
   at: string;
-  kind: 'passport' | 'master' | 'legacy' | 'des' | 'restore';
+  kind: 'passport' | 'master' | 'legacy' | 'des' | 'restore' | 'scenario';
   message: string;
 }
 
@@ -256,4 +290,8 @@ export interface HubState {
   mappingProfiles: ColumnMappingProfile[];
   ingestLog: IngestLogEntry[];
   updatedAt: string;
+  /** Scenario levers (optional so Live Baseline data stays unchanged). */
+  subcontracts?: Subcontract[];
+  macroOverrides?: Record<string, MacroOverride>;
+  costAdjustments?: CostAdjustment[];
 }

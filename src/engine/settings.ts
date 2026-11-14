@@ -18,6 +18,8 @@ export const DEFAULT_DICTIONARY: Dictionary = {
   utilityAmberPct: 85,
   desTolerancePct: 5,
   desBufferLimit: 25,
+  contributionMarginGbp: 450,
+  depreciationYears: 10,
 };
 
 export const COMPLEXITY_CLASSES: ComplexityClass[] = ['A', 'B', 'C', 'D', 'E'];
