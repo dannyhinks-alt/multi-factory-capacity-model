@@ -2,12 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { buildSeedState } from '../data/seed';
 import { computeModel, type HubModel } from '../engine/model';
 import type { AuditAction, HubState, SignOffStatus } from '../engine/types';
-import { canPromote, carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
+import { carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
 import { deleteScenarioStore, listSnapshots, loadScenarios, loadState, migrateState, pushSnapshot, saveScenario, saveState, type Snapshot } from './persistence';
-import { createScenario, editScenario, LIVE_ID, type Scenario } from '../engine/scenario';
+import { createScenario, editScenario, LIVE_ID, promoteScenarioState, type Scenario } from '../engine/scenario';
 import type { SmartKind } from '../engine/smartimport';
 import type { ViewId } from '../engine/systemmap';
-import { mergeFixedProcessOnPromotion } from '../engine/fixedprocess';
 
 interface HubCtx {
   state: HubState;
@@ -19,7 +18,7 @@ interface HubCtx {
   /** Apply a state transition; `label` marks it as significant (auto-snapshot candidate). */
   update: (fn: (s: HubState) => HubState, label?: string) => void;
   replaceState: (s: HubState, label: string, action?: AuditAction) => void;
-  /** V1.2 governance */
+  /** Governance */
   signOffLive: (status: SignOffStatus, note?: string) => void;
   setCurrentUser: (name: string) => void;
   setScenarioStatus: (id: string, status: SignOffStatus) => void;
@@ -38,11 +37,11 @@ interface HubCtx {
   /** Deep-link navigation available to any panel (registered by the app shell). */
   navigateTo: (view: ViewId, tab?: string, cellId?: string) => void;
   registerNavigator: (fn: (view: ViewId, tab?: string, cellId?: string) => void) => void;
-  /** Non-blocking status toasts (V1.5) — replace window.alert(). */
+  /** Non-blocking status toasts — replace window.alert(). */
   toasts: Toast[];
   notify: (message: string, tone?: Toast['tone']) => void;
   dismissToast: (id: number) => void;
-  /** Universal Smart Import hand-off (V1.4): a detected file waiting for its target view to pick it up. */
+  /** Universal Smart Import hand-off: a detected file waiting for its target view to pick it up. */
   pendingImport: PendingImport | null;
   setPendingImport: (p: PendingImport | null) => void;
   /** Consume the pending import if it is one of `kinds` (returns null otherwise). */
@@ -212,18 +211,11 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const promoteScenario = useCallback(async (id: string) => {
     const sc = scenariosRef.current.find((s) => s.id === id);
     if (!sc) return;
-    // Governance gate (Dictionary): optionally require Reviewed / Approved before promotion.
-    const gate = canPromote(sc.status, state.settings);
-    if (!gate.ok) throw new Error(gate.reason);
+    // Pure promotion (throws if the Dictionary governance gate blocks it) — validated before snapshotting.
+    const next = promoteScenarioState(state, sc);
     setSnapshots(await pushSnapshot(state, `Before promoting scenario “${sc.name}”`));
     lastSnap.current = Date.now();
-    const at = new Date().toISOString();
-    const promoted: HubState = { ...sc.state, governance: governanceOf(state), fixedProcess: mergeFixedProcessOnPromotion(state.fixedProcess, sc.state.fixedProcess), updatedAt: at, ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${sc.log.length} changes)` }, ...state.ingestLog].slice(0, 200) };
-    setState(recordAudit(promoted, 'Baseline promotion', `Scenario “${sc.name}” (${sc.status ?? 'Draft'}, ${sc.log.length - 1} changes, based on ${sc.basedOn}) promoted to Live Baseline`, {
-      bump: 'major',
-      status: sc.status === 'Approved Baseline' ? 'Approved Baseline' : 'Draft',
-      at,
-    }));
+    setState(next);
   }, [state]);
 
   const setScenarioStatus = useCallback((id: string, status: SignOffStatus) => {

@@ -1,10 +1,11 @@
 /**
- * Universal Smart Import (V1.4): inspects any dropped .json / .xlsx / .csv file and detects what it is,
+ * Universal Smart Import: inspects any dropped .json / .xlsx / .csv file and detects what it is,
  * so the hub can jump straight into the matching import / diff preview with the file pre-loaded.
  */
 import { mapFixedColumns } from './fixedprocess';
 import { fuzzyMapColumns, TARGET_FIELDS } from './importer';
 import { mapLegacyColumns } from './legacy';
+import { parseJsonText } from './csv';
 import { readWorkbook, type SheetData } from './sheet';
 import type { ImportTarget } from './types';
 
@@ -77,9 +78,9 @@ export function detectFile(fileName: string, buf: ArrayBuffer): Detection {
   if (lower.endsWith('.json')) {
     let j: unknown;
     try {
-      j = JSON.parse(new TextDecoder().decode(buf));
-    } catch {
-      return { kind: 'unknown', confidence: 0, reason: 'Invalid JSON', summary: '', alternatives: [] };
+      j = parseJsonText(new TextDecoder().decode(buf), fileName);
+    } catch (e) {
+      return { kind: 'unknown', confidence: 0, reason: (e as Error).message, summary: '', alternatives: [] };
     }
     const o = j as Record<string, unknown>;
     if (o && (o.kind === 'multi-factory-hub-backup' || (Array.isArray(o.passports) && Array.isArray(o.bom)))) {

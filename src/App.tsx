@@ -12,6 +12,7 @@ import ScenarioPlanner from './workspaces/ScenarioPlanner';
 import FixedProcess from './workspaces/FixedProcess';
 import EcrRelease from './workspaces/EcrRelease';
 import { buildSeedState } from './data/seed';
+import { APP_VERSION_LABEL } from './engine/version';
 import { GovernancePanel, IntegrityPanel, VersionBadge } from './components/Governance';
 import { StoresPanel } from './components/StoresPanel';
 import { SystemMap } from './components/SystemMap';
@@ -21,7 +22,6 @@ import type { ViewId } from './engine/systemmap';
 import { ALL_VIEWS, EXECUTIVE_VIEWS, phasesFor, resolveNav, type NavTarget, type ViewMode } from './engine/navigation';
 
 /** Legacy workspace IDs are still accepted by `navigate` and map onto the phase views. */
-export type WorkspaceId = ViewId;
 
 export type { NavTarget, ViewMode } from './engine/navigation';
 export { PHASES, EXECUTIVE_VIEWS, phasesFor, resolveNav } from './engine/navigation';
@@ -85,7 +85,7 @@ export default function App() {
 
   const onRestore = async (f: File) => {
     try {
-      const next = parseBackup(await f.text(), buildSeedState());
+      const next = parseBackup(await f.text(), buildSeedState(), f.name);
       replaceState({ ...next, ingestLog: [{ at: new Date().toISOString(), kind: 'restore', message: `Restored full-plant backup ${f.name}` }, ...next.ingestLog] }, `Restore ${f.name}`, 'Backup restore');
     } catch (e) {
       notify(`Restore failed: ${(e as Error).message}`, 'critical');
@@ -98,7 +98,7 @@ export default function App() {
         <div className="flex flex-wrap items-center gap-3 bg-slate-900 px-4 py-2 text-slate-100">
           <div className="mr-2 leading-tight">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Multi-Factory</div>
-            <div className="text-sm font-semibold">Master Control Hub</div>
+            <div className="text-sm font-semibold">Master Control Hub <span className="ml-1 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-200">{APP_VERSION_LABEL}</span></div>
           </div>
           <nav className="flex flex-wrap gap-1" aria-label="Lifecycle phases">
             {phases.map((p) => (

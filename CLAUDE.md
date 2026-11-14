@@ -1,4 +1,6 @@
-# Project: Multi-Factory Master Capacity, Services & Simulation Hub (MVP)
+# Project: Multi-Factory Master Capacity, Services & Simulation Hub — Multi-Factory Master Control Hub v1.0
+
+Release **1.0.0** (`package.json`, `src/engine/version.ts`). Present the complete integrated platform as *Multi-Factory Master Control Hub v1.0* — no incremental build tags in UI copy, tooltips, headers or docs.
 
 ## 1. Core Objective
 Build an offline-first React + TypeScript + Vite + Tailwind CSS web application (**Multi-Factory Master Control Hub**) that orchestrates **40–50+ Cell Design Passports** (`10–12+ cells per factory` across **`F1`, `F2`, `F3`, `F4`**). Use **British English** throughout (`utilisation`, `despatch`, `analyse`, `programme`, `centre`, `£`) and zero retail terminology (`Variant` / `Programme` / `Assembly` only).
@@ -33,7 +35,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
 6. **Plant Simulation / DES Export & Validation:**
    - Exports a clean, flat **Plant Simulation / DES Routing & Schedule Table (`CSV` / `JSON`)** using the folded **Macro-Operations** (collapsing thousands of micro-steps into clean simulation blocks), plus DES result re-import (`AGREE` vs. `DISAGREE` flags and buffer queue monitoring).
 
-7. **Static Scenario Planner & Cause-Effect Studio (V1.1):**
+7. **Static Scenario Planner & Cause-Effect Studio:**
    - **Non-destructive scenario engine (copy-on-write):** clone the Live Baseline (or any scenario) into named scenarios (Baseline vs Scenario A/B/C…) stored in the IndexedDB `scenarios` store (DB version 2). Live ingested Cell Passports are never mutated; **Promote Scenario to Live Baseline** asks for confirmation and takes an automatic IndexedDB snapshot first.
    - **Cell vs. Cells (Topology & Layout):** move, clone (replicate with % dual-source), merge or decommission cells across `F1–F4`; footprint (`8 m²` fixed + `20%` + `35%` circulation) vs per-factory floor-area ceilings, utility demand vs plant ceilings, and **Relocation vs Replication CapEx (£)**.
    - **Asset vs. Asset Load:** reassign machines between cells (same-category units join as parallel machines; ops left without their machine are starved), **Asset Load Heatmap** (% of available shift hours, Q1–Q4 + annual, Baseline / Scenario / Δ) and Binding Capacity Cap re-check.
@@ -42,7 +44,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - **Side-by-side comparison matrix** (Throughput, Utilisation %, Bottleneck count, Peak-quarter overloads, CapEx £, Incremental investment, Unit Conversion Cost £, Payback years, Footprint m², Utility & space overruns, OEE, TEEP, PCE) with delta badges, plus the automated **"Key Effects & Possible Causes"** diagnostic chain (binding-constraint shifts, L2–L5 scrap/material ripple, schedule changes, F1–F4 utility/space threshold triggers, gate changes, cost drivers).
    - Export the comparison report (`.csv` / `.json` / print-friendly HTML) and send any scenario straight into Workspace 6 (DES Export) via its source selector.
 
-## 4. V1.2 Extensions: Buffers, WIP & Stores · Tecnomatix Preset · Governance
+## 4. Buffers, WIP & Stores · Tecnomatix Preset · Governance
 1. **Buffers, WIP & Stores Engine** (linked to BOM, Cells, Footprint & Scenarios):
    - 4 storage tiers across `F1–F4`: **Raw Material & Bought-Out Stores (L5)**, **Kitting/Marshalling Zones (L2–L4)**, **Inter-Cell WIP Buffers / Line-Side Supermarkets**, **Finished Goods & Despatch Staging (L1)**.
    - Recommended inter-cell WIP buffer = batch + setup cover + OEE-variability safety (z × CV(OEE) × demand rate × replenishment time); plus **Days of Cover**, storage locations/stillages, **Stores Footprint (m²)** and **Working Capital Tied Up (£)** (standard cost rolled up the BOM: L5 unit cost + route work content × conversion £/min).
@@ -53,7 +55,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Live **Logic & Data Integrity Check**: BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services (orphaned IDs, unmapped nodes, circular BOM links, missing skill/utility links).
    - **Baseline Change Governance:** version badge (`vMAJOR.MINOR`), sign-off status (`Draft` / `Reviewed` / `Approved Baseline`) for the baseline and each scenario, and a structured **Audit Log** of baseline promotions, Cell Passport re-ingestions, Master Data / legacy imports, sign-offs, restores and resets.
 
-## 5. V1.3 Extensions: Fixed Process Governance · IDEF0 System Map · 4-Phase Navigation
+## 5. Fixed Process Governance · IDEF0 System Map · 4-Phase Navigation
 1. **Simplified 4-Phase Top Navigation** (no sidebar; phase tabs + view pills):
    - **Phase 1 · Control & Architecture:** Factory Control Hub, Interactive IDEF0 / Swimlane System Map, Logic & Data Integrity Check, Baseline Governance / Audit Log.
    - **Phase 2 · Inputs & Master Data:** Fixed Process Baseline, Cell Passports, 5-Level BOM & Schedule, Assets & Workforce Skills (0–3, Dictionary), Buffers & Stores.
@@ -68,7 +70,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Compare / Ingest Updated Fixed Process Revision diffs Rev N → Rev N+1 against the locked baseline and the Working Factory Design (deviations falling back into alignment, newly deviating ops, impacted cells) before locking (audited `Fixed Process revision`).
    - 1-click New Fixed Process Release / ECR Pack (`.xlsx` 5 sheets / `.csv` / print-ready sign-off pack) of approved, justified drifts with cycle/setup deltas, proposed Rev N+1 steps and working macro-blocks; can be issued & locked as the next revision.
 
-## 6. V1.4: UX Simplification, Guided Action Strip & Logic-Link Tightening
+## 6. UX Simplification, Guided Action Strip & Logic-Link Tightening
 1. **Universal Smart File Drop-Zone** (header **⬆ Smart Import**): drop any `.json` / `.xlsx` / `.csv`; the hub detects Cell Design Passports, Fixed Process Baseline / Revision, Master Assets / Fixtures / Skills, Legacy Capacity/BOM Workbook, Siemens Plant Simulation Statistics, DES results or a Full-Plant Backup (with confidence, reason and alternatives) and jumps into the matching import / diff preview with the file pre-loaded (backups restore after confirmation and snapshot).
 2. **Guided Next Actions strip** at the top of Phase 1 (Factory Control Hub), driven by the Ingestion Audit, Fixed Process Drift and Logic Integrity engines (unmapped BOM nodes with 1-click **Auto-Match**, compliance deviations, gate-blocked cells, bottlenecks, utility / space overruns, integrity errors, drifts awaiting justification, ECR-ready drifts, baseline sign-off) with jump buttons.
    - **Executive View / Full Engineering** toggle in the top bar: Executive View shows Factory Control Hub, IDEF0 / Swimlane Map, Static Scenario Planner and Validation / ECR outputs; Full Engineering shows all 15 views. Jumping to an engineering-only view switches mode automatically.
@@ -77,7 +79,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Route vs Route Macro-Block editor: optional **Effective OEE %** override and quick **Shift Pattern** (1/2/3 shifts, matching crew recruited/released).
    - Dictionary Defaults governance toggle: **Require Reviewed/Approved status before promoting Scenario to Live Baseline** (enforced in the UI and in the promotion itself).
 
-## 7. V1.5: Alias Dictionary, "Needs Data Action" Passport Feedback Loop & Edge-to-Edge Polish
+## 7. Alias Dictionary, "Needs Data Action" Passport Feedback Loop & Edge-to-Edge Polish
 1. **Persistent Alias Dictionary** (`state.aliases`, Phase 2 → Assets & Workforce Skills → Alias Dictionary, included in Full-Plant JSON backups) mapping incoming nicknames to canonical IDs across 4 domains: Cell IDs (e.g. `Cell_A` → `CELL-A`), BOM Part / Variant IDs, Master Asset IDs and Master Tooling / Fixture IDs.
    - Cell Passport ingestion & Smart Import resolve aliases and detect near-duplicate typos (case/punctuation-only differences, or ≤ 2 insertions / deletions / transpositions — not substitutions, so sibling IDs such as CELL-A / CELL-B stay distinct). **0 mismatches → silent auto-ingest**; otherwise the preview offers **Map & Remember Alias** (or Keep as new) per unrecognised ID / typo.
    - Per-cell **Data Quality Score (%)** with a plain-English source punch-list; cells relying on aliases, fuzzy matches or missing catalogue / service fields get a **Needs Data Action** badge (Phase 1 Guided Next Actions, Phase 2 Cell Passports, Phase 3 Cells & Macro-Routing).

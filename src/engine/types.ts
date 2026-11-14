@@ -142,7 +142,7 @@ export interface CellPassport {
   crew: PassportOperator[];
   routes: PassportRoute[];
   serviceAllowance?: Partial<ServiceVector>;
-  /** V1.5 provenance: aliases / fuzzy resolutions applied when this passport was ingested. */
+  /** Provenance: aliases / fuzzy resolutions applied when this passport was ingested. */
   ingestNotes?: PassportIngestNotes;
 }
 
@@ -235,7 +235,7 @@ export interface MacroOverride {
   setupMin?: number;
   cycleMin?: number;
   batchSize?: number;
-  /** Effective OEE % override for this route's Macro-Block (V1.4). */
+  /** Effective OEE % override for this route's Macro-Block. */
   oeePct?: number;
 }
 
@@ -297,13 +297,13 @@ export interface Dictionary {
   relocationRiggingPct: number;
   /** Fixed recommissioning £ per relocated or merged cell (Workspace 7). */
   recommissioningGbp: number;
-  /** Buffers, WIP & Stores (V1.2). */
+  /** Buffers, WIP & Stores. */
   stores: StoresDictionary;
-  /** Fixed Process drift tolerances (V1.3). */
+  /** Fixed Process drift tolerances. */
   drift: DriftTolerances;
-  /** Siemens Plant Simulation shift-calendar defaults (V1.3). */
+  /** Siemens Plant Simulation shift-calendar defaults. */
   plantSim: PlantSimDefaults;
-  /** Governance gate (V1.4): only Reviewed / Approved scenarios may be promoted to Live Baseline. */
+  /** Governance gate: only Reviewed / Approved scenarios may be promoted to Live Baseline. */
   requireApprovalForPromotion: boolean;
 }
 
@@ -415,16 +415,16 @@ export interface HubState {
   subcontracts?: Subcontract[];
   macroOverrides?: Record<string, MacroOverride>;
   costAdjustments?: CostAdjustment[];
-  /** V1.2 governance & simulation statistics. */
+  /** Governance & simulation statistics. */
   governance?: Governance;
   tecnomatixStats?: TxStat[];
-  /** V1.3 locked Fixed Process Baseline reference layer. */
+  /** Locked Fixed Process Baseline reference layer. */
   fixedProcess?: FixedProcessBaseline;
-  /** V1.5 persistent Alias Dictionary (nicknames → canonical IDs). */
+  /** Persistent Alias Dictionary (nicknames → canonical IDs). */
   aliases?: AliasEntry[];
 }
 
-// ---------------------------------------------------------------- V1.3 Fixed Process governance
+// ---------------------------------------------------------------- Fixed Process governance
 
 export interface DriftTolerances {
   /** |Δ cycle| within this % of standard → ALIGNED. */

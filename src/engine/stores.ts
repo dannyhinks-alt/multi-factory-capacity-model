@@ -1,5 +1,5 @@
 /**
- * Buffers, WIP & Stores engine (V1.2).
+ * Buffers, WIP & Stores engine.
  *
  * Four storage tiers across F1–F4, all driven by the exploded 5-level BOM, the BOM ↔ Cell Route
  * mappings and the folded Cell Macro-Blocks:

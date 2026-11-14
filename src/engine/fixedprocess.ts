@@ -1,5 +1,5 @@
 /**
- * Fixed Process Governance & Drift Reconciliation (V1.3).
+ * Fixed Process Governance & Drift Reconciliation.
  *
  * The Fixed Process Baseline is a locked reference layer — the formal, released Fixed Process Documents
  * (Doc ID + Revision). It is never edited in place; it only changes by ingesting a new revision through
@@ -497,7 +497,7 @@ export function baselineRows(steps: FixedProcessStep[]): Record<string, unknown>
 }
 
 /**
- * Promotion merge (V1.5): the locked Fixed Process layer stays authoritative from the Live Baseline
+ * Promotion merge: the locked Fixed Process layer stays authoritative from the Live Baseline
  * (scenarios cannot change it), while drift justifications recorded inside the scenario are carried over
  * (scenario entries win over live ones for the same drift).
  */

@@ -17,7 +17,7 @@ import {
 } from '../engine/fixedprocess';
 import { governanceOf } from '../engine/governance';
 import { LIVE_ID } from '../engine/scenario';
-import { readWorkbook, writeWorkbook, type SheetData } from '../engine/sheet';
+import { readWorkbook, requireRows, writeWorkbook, type SheetData } from '../engine/sheet';
 import type { DriftClass, FixedProcessStep } from '../engine/types';
 import { FACTORIES } from '../engine/types';
 import { useHub } from '../store/HubContext';
@@ -244,14 +244,14 @@ function RevisionView({ initialFile }: { initialFile?: File | null }) {
   const load = async (files: File[]) => {
     try {
       const f = files[0];
-      const s = readWorkbook(await f.arrayBuffer(), f.name);
+      const s = requireRows(readWorkbook(await f.arrayBuffer(), f.name), f.name);
       setSheets(s);
       setSheetIdx(0);
       const m = mapFixedColumns(s[0]?.headers ?? []);
       setMapping(m);
       const p = parseFixedRows(s[0]?.rows ?? [], m);
       setIncoming(p.steps);
-      setWarnings(p.warnings);
+      setWarnings(p.steps.length ? p.warnings : [`No Fixed Process steps recognised in ${f.name} — map the BOM Part ID and Op No columns below.`, ...p.warnings]);
       setDone('');
     } catch (e) {
       notify(`Could not read file: ${(e as Error).message}`, 'critical');

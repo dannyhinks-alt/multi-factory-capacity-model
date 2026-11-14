@@ -227,7 +227,7 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
   let machineCap = Infinity;
   let oeeWeighted = 0;
   let oeeWeight = 0;
-  // Optional route-level Effective OEE override (V1.4): the route's machine load is re-expressed at the
+  // Optional route-level Effective OEE override: the route's machine load is re-expressed at the
   // asset's own OEE so cell-level resource utilisation stays consistent with the overridden macro-block.
   const ovr = route.oeeOverridePct !== undefined ? Math.min(100, Math.max(5, route.oeeOverridePct)) / 100 : undefined;
   for (const [assetId, load] of Object.entries(assetLoad)) {

@@ -1,5 +1,5 @@
 /**
- * Siemens Tecnomatix Plant Simulation export & validation preset (V1.2).
+ * Siemens Tecnomatix Plant Simulation export & validation preset.
  *
  * Generates the four DataTables a Plant Simulation model builder reads —
  * Routing_DataTable, ProductionPlan_DataTable, ShiftCalendar_DataTable and Buffer_DataTable —
@@ -7,7 +7,7 @@
  * and validates re-imported Station / Buffer / Drain statistics (StatWorkingTime, StatBlockingTime,
  * StatWaitingTime, StatThroughput) against the analytic model.
  */
-import { parseCsv } from './csv';
+import { parseCsv, parseJsonText } from './csv';
 import { buildDesRouting, buildDesSchedule } from './des';
 import type { HubModel } from './model';
 import { throughputOf } from './scenario';
@@ -177,8 +177,8 @@ export function buildTecnomatixExport(model: HubModel, state: HubState): TxExpor
 export function parseTxStats(text: string, fileName: string): TxStat[] {
   let rows: Record<string, unknown>[];
   if (fileName.toLowerCase().endsWith('.json')) {
-    const j = JSON.parse(text);
-    rows = Array.isArray(j) ? j : j.statistics ?? j.rows ?? [];
+    const j = parseJsonText(text, fileName) as any;
+    rows = (Array.isArray(j) ? j : j?.statistics ?? j?.rows ?? []).filter((r: unknown) => r && typeof r === 'object');
   } else {
     const delim = text.split('\n')[0].includes('\t') ? '\t' : text.split('\n')[0].includes(';') && !text.split('\n')[0].includes(',') ? ';' : ',';
     rows = parseCsv(delim === ',' ? text : text.replace(new RegExp(delim, 'g'), ','));

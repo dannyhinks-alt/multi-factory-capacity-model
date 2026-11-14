@@ -10,7 +10,7 @@ import { Badge, Button, Card, Meter, Pills, download, fmtGbp, fmtNum, input, td,
 const TIER_COLOUR: Record<StoreTier, string> = { RM: '#2a78d6', KIT: '#eb6834', WIP: '#1baf7a', FG: '#eda100' };
 
 /**
- * Buffers, WIP & Stores (V1.2) for Workspace 4: four storage tiers per factory with Days of Cover,
+ * Buffers, WIP & Stores panel (Phase 2 · Buffers & Stores): four storage tiers per factory with Days of Cover,
  * locations / stillages, footprint (m²) and Working Capital Tied Up (£), plus every recommended
  * inter-cell WIP buffer and the factory space balance (cells + circulation + stores vs ceiling).
  */

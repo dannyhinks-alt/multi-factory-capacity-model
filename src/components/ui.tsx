@@ -17,8 +17,6 @@ export const fmtPct = (n: number, dp = 0) => (!Number.isFinite(n) ? '∞' : `${d
 
 // ---------------------------------------------------------------- tokens (dataviz reference palette)
 export const STATUS = { good: '#0ca30c', warning: '#fab219', serious: '#ec835a', critical: '#d03b3b' } as const;
-export const FACTORY_COLOUR: Record<FactoryId, string> = { F1: '#2a78d6', F2: '#eb6834', F3: '#1baf7a', F4: '#eda100' };
-
 export function utilColour(pct: number, near = 85, limit = 100) {
   if (!Number.isFinite(pct) || pct >= limit) return STATUS.critical;
   if (pct >= near) return STATUS.warning;
@@ -203,10 +201,6 @@ export function download(filename: string, content: string | Blob, mime = 'text/
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-export function readFileText(f: File): Promise<string> {
-  return f.text();
 }
 
 export function Empty({ children }: { children: ReactNode }) {

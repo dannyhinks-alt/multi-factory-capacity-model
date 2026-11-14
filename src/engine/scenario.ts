@@ -1,5 +1,5 @@
 /**
- * Static Scenario Planner & Cause-Effect Studio (V1.1).
+ * Static Scenario Planner & Cause-Effect Studio.
  *
  * Every scenario owns an isolated deep copy of the hub state (copy-on-write: each edit clones the
  * scenario's state before mutating it), so live ingested Cell Passports are never touched until a
@@ -14,7 +14,8 @@ import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector, SignOffStatus } from './types';
 import { FACTORIES, QUARTERS, STORE_TIER_NAMES } from './types';
 import { solveWhatIf } from './whatif';
-import { DRIFT_SEVERITY, reconcile } from './fixedprocess';
+import { DRIFT_SEVERITY, mergeFixedProcessOnPromotion, reconcile } from './fixedprocess';
+import { canPromote, governanceOf, recordAudit } from './governance';
 
 // ---------------------------------------------------------------- scenario container
 
@@ -32,13 +33,37 @@ export interface Scenario {
   updatedAt: string;
   state: HubState;
   log: ScenarioLogEntry[];
-  /** Scenario sign-off (V1.2): Draft → Reviewed → Approved Baseline (approved for promotion). */
+  /** Scenario sign-off: Draft → Reviewed → Approved Baseline (approved for promotion). */
   status?: SignOffStatus;
   signedOffBy?: string;
   signedOffAt?: string;
 }
 
 export const LIVE_ID = 'live';
+
+/**
+ * Promote a scenario to the Live Baseline (pure). Enforces the Dictionary governance gate
+ * (`requireApprovalForPromotion` → scenario must be Reviewed / Approved Baseline), keeps the live
+ * governance record, merges scenario drift justifications into the live locked Fixed Process layer,
+ * and records a major-version `Baseline promotion` audit entry. Throws a friendly error when gated.
+ */
+export function promoteScenarioState(live: HubState, sc: Scenario, at = new Date().toISOString()): HubState {
+  const gate = canPromote(sc.status, live.settings);
+  if (!gate.ok) throw new Error(gate.reason);
+  const changes = Math.max(0, sc.log.length - 1); // first log entry is the clone itself
+  const promoted: HubState = {
+    ...sc.state,
+    governance: governanceOf(live),
+    fixedProcess: mergeFixedProcessOnPromotion(live.fixedProcess, sc.state.fixedProcess),
+    updatedAt: at,
+    ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${changes} changes)` }, ...live.ingestLog].slice(0, 200),
+  };
+  return recordAudit(promoted, 'Baseline promotion', `Scenario “${sc.name}” (${sc.status ?? 'Draft'}, ${changes} changes, based on ${sc.basedOn}) promoted to Live Baseline`, {
+    bump: 'major',
+    status: sc.status === 'Approved Baseline' ? 'Approved Baseline' : 'Draft',
+    at,
+  });
+}
 export const SCENARIO_COLOURS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#6250d6', '#008300', '#e34948'];
 
 const clone = <T,>(v: T): T => (typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
@@ -607,11 +632,11 @@ export interface ScenarioMetrics {
   pcePct: number;
   /** Cells whose peak quarter exceeds the bottleneck threshold (launch-ramp / phasing stress). */
   peakOverloads: number;
-  /** Buffers, WIP & Stores (V1.2). */
+  /** Buffers, WIP & Stores. */
   storesFootprintM2: number;
   workingCapitalGbp: number;
   wipBuffers: number;
-  /** Fixed Process drift (V1.3). */
+  /** Fixed Process drift. */
   processAlignmentPct: number;
   complianceDeviations: number;
   maturingDrifts: number;
@@ -1096,7 +1121,7 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
     }
   }
 
-  // Fixed Process drift chain (V1.3)
+  // Fixed Process drift chain
   if (sc.metrics.complianceDeviations !== base.metrics.complianceDeviations || sc.metrics.maturingDrifts !== base.metrics.maturingDrifts || sc.metrics.newLocalSteps !== base.metrics.newLocalSteps) {
     const before = new Map(reconcile(bs).items.map((i) => [i.key, i.cls]));
     const changed = reconcile(ss).items.filter((i) => before.get(i.key) !== i.cls);

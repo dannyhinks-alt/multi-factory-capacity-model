@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuditPanel } from '../components/AuditPanel';
 import { Badge, Button, Card, DropZone, Pills, download, fmtNum, input, td, tdNum, th } from '../components/ui';
-import { toCsv } from '../engine/csv';
+import { parseJsonText, toCsv } from '../engine/csv';
 import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyColumnMapping, type ImportMode, type MergeReport } from '../engine/importer';
 import type { IngestReport } from '../engine/ingest';
 import { ALIAS_DOMAIN_LABELS, addAlias, ingestWithAliases, knownIds, preparePassports, type IdCheck, type PreparedPassport } from '../engine/aliases';
@@ -9,7 +9,7 @@ import { AliasManager, DataQualityPanel } from '../components/DataQuality';
 import { MASTER_TARGET } from '../engine/smartimport';
 import { LEGACY_FIELDS, applyLegacy, convertLegacy, mapLegacyColumns, type LegacyConversion } from '../engine/legacy';
 import { COMPLEXITY_CLASSES } from '../engine/settings';
-import { readWorkbook, writeWorkbook, type SheetData } from '../engine/sheet';
+import { readWorkbook, requireRows, writeWorkbook, type SheetData } from '../engine/sheet';
 import type { Asset, CellPassport, Competence, Dictionary, Fixture, HubState, ImportTarget, SkillRole, StoreTier } from '../engine/types';
 import { FACTORIES, STORE_TIER_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
@@ -333,7 +333,7 @@ function MasterImporter() {
     setReport(null);
     try {
       const f = files[0];
-      const s = readWorkbook(await f.arrayBuffer(), f.name);
+      const s = requireRows(readWorkbook(await f.arrayBuffer(), f.name), f.name);
       const idx = Math.max(0, sheetName ? s.findIndex((x) => x.name === sheetName) : 0);
       setSheets(s);
       setFileName(f.name);
@@ -399,7 +399,7 @@ function MasterImporter() {
               </form>
             )}
             <Button disabled={!profiles.length} onClick={() => download(`mapping-profiles-${target}.json`, JSON.stringify(profiles, null, 2), 'application/json')}>⬇ Profiles</Button>
-            <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">⬆ Profiles<input type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const arr = JSON.parse(await f.text()); const list = (Array.isArray(arr) ? arr : [arr]).filter((p: any) => p?.name && p?.target && p?.columns); update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => !list.some((l: any) => l.name === p.name)), ...list] })); notify(`Imported ${list.length} mapping profile(s)`, 'good'); } catch { notify('Invalid mapping profile file', 'critical'); } }} /></label>
+            <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">⬆ Profiles<input type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const arr = parseJsonText(await f.text(), f.name); const list = (Array.isArray(arr) ? arr : [arr]).filter((p: any) => p?.name && p?.target && p?.columns); if (!list.length) { notify(`No mapping profiles found in ${f.name}`, 'critical'); return; } update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => !list.some((l: any) => l.name === p.name)), ...list] })); notify(`Imported ${list.length} mapping profile(s)`, 'good'); } catch (err) { notify((err as Error).message, 'critical'); } }} /></label>
           </>
         }
       >
@@ -459,7 +459,7 @@ function MasterImporter() {
 type Staged = { source: string; prepared: PreparedPassport[] };
 
 /**
- * Cell Passport ingestion (V1.5 alias-aware): every dropped / Smart-Imported passport is checked
+ * Cell Passport ingestion (alias-aware): every dropped / Smart-Imported passport is checked
  * against the Alias Dictionary and catalogues. 0 mismatches → ingested silently; otherwise the preview
  * lists each unrecognised ID / near-duplicate typo with “Map & Remember Alias”.
  */
@@ -491,7 +491,14 @@ function PassportIngest() {
   };
   useEffect(() => {
     const p = takePendingImport(['passports']);
-    if (p) void p.file.text().then((t) => stage([{ name: p.file.name, data: JSON.parse(t) }], `${p.file.name} (Smart Import)`));
+    if (p)
+      void p.file.text().then((t) => {
+        try {
+          stage([{ name: p.file.name, data: parseJsonText(t, p.file.name) }], `${p.file.name} (Smart Import)`);
+        } catch (e) {
+          notify((e as Error).message, 'critical');
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImport]);
   const ingest = async (files: File[]) => {
@@ -500,9 +507,9 @@ function PassportIngest() {
     const errors: string[] = [];
     for (const f of files) {
       try {
-        raws.push({ name: f.name, data: JSON.parse(await f.text()) });
+        raws.push({ name: f.name, data: parseJsonText(await f.text(), f.name) });
       } catch (e) {
-        errors.push(`${f.name}: ${(e as Error).message}`);
+        errors.push((e as Error).message);
       }
     }
     stage(raws, `${files.length} passport file(s)`, errors);
@@ -663,7 +670,7 @@ function LegacyImporter() {
   const load = async (files: File[]) => {
     const f = files[0];
     try {
-      const s = readWorkbook(await f.arrayBuffer(), f.name);
+      const s = requireRows(readWorkbook(await f.arrayBuffer(), f.name), f.name);
       setSheets(s);
       setSheetIdx(0);
       setMapping(mapLegacyColumns(s[0]?.headers ?? []));
@@ -795,7 +802,7 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           <div className="pt-2 text-xs font-semibold text-slate-700">Scenario relocation defaults (Workspace 7)</div>
           {num('Relocation rigging / transport (% of asset CapEx)', 'relocationRiggingPct', '%')}
           {num('Recommissioning per relocated / merged cell', 'recommissioningGbp', '£')}
-          <div className="pt-2 text-xs font-semibold text-slate-700">Fixed Process drift tolerances (V1.3)</div>
+          <div className="pt-2 text-xs font-semibold text-slate-700">Fixed Process drift tolerances</div>
           {driftNum('ALIGNED cycle tolerance (±)', 'cycleTolerancePct')}
           {driftNum('ALIGNED setup tolerance (±)', 'setupTolerancePct')}
           {driftNum('Compliance limit — beyond this is a COMPLIANCE DEVIATION (±)', 'complianceTolerancePct')}

@@ -1,5 +1,5 @@
 /**
- * IDEF0 / Swimlane System Map model (V1.3): Inputs (left), Controls (top), four swimlanes of
+ * IDEF0 / Swimlane System Map model: Inputs (left), Controls (top), four swimlanes of
  * activities and Outputs (right), each node carrying a live status badge and a target view for
  * click-to-jump navigation.
  */

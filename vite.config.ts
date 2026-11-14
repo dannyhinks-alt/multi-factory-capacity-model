@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
       outDir: offline ? 'dist-offline' : 'dist',
       emptyOutDir: true,
       chunkSizeWarningLimit: 4000,
+      // Single-file build has no preload links; drop the polyfill so the bundle makes zero network calls.
+      modulePreload: offline ? { polyfill: false } : undefined,
     },
     test: {
       globals: true,

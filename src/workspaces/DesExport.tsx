@@ -48,9 +48,13 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
       try {
         all.push(...parseDesResults(await f.text(), f.name));
       } catch (e) {
-        setMsg(`${f.name}: ${(e as Error).message}`);
+        setMsg((e as Error).message);
         return;
       }
+    }
+    if (!all.length) {
+      setMsg(`No DES result rows found in ${files.map((f) => f.name).join(', ')} — expected Cell ID and Utilisation % columns. Existing results were kept.`);
+      return;
     }
     update((s) => ({ ...s, desResults: all, ingestLog: [{ at: new Date().toISOString(), kind: 'des' as const, message: `Re-imported ${all.length} DES result rows` }, ...s.ingestLog] }), 'DES results import');
     setMsg(`Imported ${all.length} DES result rows from ${files.length} file(s).`);

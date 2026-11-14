@@ -1,5 +1,5 @@
 /**
- * Guided "Next Actions" (V1.4): ranks the most important things to do next, driven by the live
+ * Guided "Next Actions": ranks the most important things to do next, driven by the live
  * Ingestion Audit, Fixed Process Drift and Logic Integrity engines plus capacity, utility and space
  * checks. Each action carries a jump target and, where safe, a 1-click quick fix.
  */
@@ -87,7 +87,7 @@ export function computeNextActions(state: HubState, model: HubModel, drift: Drif
     const cells = [...new Set(comp.map((i) => i.cellId))];
     out.push({ id: 'compliance', severity: 'critical', title: `${comp.length} Fixed Process compliance deviation${comp.length > 1 ? 's' : ''}`, detail: `${cells.slice(0, 4).join(', ')} — ${comp[0].reasons[0] ?? ''}`, count: comp.length, view: 'fixed', tab: 'drift', secondary: { label: 'Drift tolerances', view: 'master', tab: 'dictionary' } });
   }
-  // V1.5 “Needs Data Action” feedback loop and catalogue gaps.
+  // “Needs Data Action” feedback loop and catalogue gaps.
   const dq = [...cellDataQuality(state, model).values()].filter((d) => d.needsAction).sort((x, y) => x.score - y.score);
   if (dq.length) out.push({ id: 'data-action', severity: 'warning', title: `${dq.length} cell${dq.length > 1 ? 's' : ''} need data action`, detail: `${dq.slice(0, 3).map((d) => `${d.cellId} ${d.score}%`).join(' · ')} — ${dq[0].issues.find((i) => i.severity === 'action')?.text ?? 'see punch-list'}`, count: dq.length, view: 'passports', quickFix: 'export-normalised', quickFixLabel: `Export ${dq.length} normalised`, cellIds: dq.map((d) => d.cellId), secondary: { label: 'Alias Dictionary', view: 'master', tab: 'aliases' } });
   const missingAssets = [...new Set(model.cells.flatMap((c) => c.assets.filter((x) => !x.inMaster).map((x) => x.assetId)))];

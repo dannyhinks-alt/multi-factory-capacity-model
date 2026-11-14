@@ -38,6 +38,10 @@ export function TecnomatixPanel({ model, state, sourceName, navigate, initialSta
       setMsg((e as Error).message);
       return;
     }
+    if (!all.length) {
+      setMsg(`No Station / Buffer / Drain statistics rows found in ${files.map((f) => f.name).join(', ')} — expected an object path column plus StatWorkingTime / StatBlockingTime / StatWaitingTime. Existing statistics were kept.`);
+      return;
+    }
     update((s) => ({ ...s, tecnomatixStats: all, ingestLog: [{ at: new Date().toISOString(), kind: 'des' as const, message: `Imported ${all.length} Plant Simulation statistics rows` }, ...s.ingestLog] }));
     setMsg(`Imported ${all.length} Station / Buffer / Drain statistics rows.`);
   };
