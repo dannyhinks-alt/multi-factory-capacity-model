@@ -1,5 +1,5 @@
 /**
- * Baseline Change Governance (V1.2): version badge, Draft / Reviewed / Approved Baseline sign-off
+ * Baseline Change Governance: version badge, Draft / Reviewed / Approved Baseline sign-off
  * and a structured, timestamped Audit Log of every baseline promotion, Cell Passport re-ingestion
  * and Master Data import.
  */
@@ -85,7 +85,7 @@ export function auditCsv(log: AuditEntry[]): string {
 }
 
 /**
- * Promotion gate (V1.4): when the Dictionary flag “Require Reviewed/Approved status before promoting”
+ * Promotion gate: when the Dictionary flag “Require Reviewed/Approved status before promoting”
  * is on, only scenarios signed off as Reviewed or Approved Baseline may be promoted to Live Baseline.
  */
 export function canPromote(scenarioStatus: SignOffStatus | undefined, settings: HubState['settings']): { ok: boolean; reason: string } {

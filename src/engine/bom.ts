@@ -228,8 +228,4 @@ export function ancestorsOf(lineId: string, byLineId: Map<string, ExplodedLine>)
   return out;
 }
 
-export function sumQuarter(v: QuarterVector): number {
-  return v.Q1 + v.Q2 + v.Q3 + v.Q4;
-}
-
 export type { Quarter };

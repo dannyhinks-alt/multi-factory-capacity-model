@@ -1,6 +1,8 @@
 import type { HubState } from '../engine/types';
 import type { Scenario } from '../engine/scenario';
 import { DEFAULT_DICTIONARY } from '../engine/settings';
+import { APP_VERSION } from '../engine/version';
+import { parseJsonText } from '../engine/csv';
 import { defaultGovernance } from '../engine/governance';
 
 export const DB_NAME = 'multi-factory-hub-v1';
@@ -92,10 +94,10 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     },
     governance: r.governance ?? defaultGovernance(),
     tecnomatixStats: r.tecnomatixStats ?? [],
-    // Pre-V1.3 data: adopt the seeded Fixed Process Baseline (locked reference layer).
+    // Older saved data without a Fixed Process layer: adopt the seeded Fixed Process Baseline (locked reference layer).
     fixedProcess: r.fixedProcess ?? fallback.fixedProcess,
     aliases: r.aliases ?? [],
-    // Pre-V1.2 data: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
+    // Older saved data without stores / governance: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
     bom: r.governance ? r.bom : r.bom.map((b) => (b.unitCostGbp === undefined && b.level === 5 ? { ...b, unitCostGbp: fallback.bom.find((x) => x.partId === b.partId)?.unitCostGbp } : b)),
     desResults: r.desResults ?? [],
     mappingProfiles: r.mappingProfiles ?? fallback.mappingProfiles,
@@ -217,34 +219,15 @@ export async function deleteScenarioStore(id: string): Promise<void> {
   lsSet(LS_SCENARIOS, (lsGet<Scenario[]>(LS_SCENARIOS) ?? []).filter((x) => x.id !== id));
 }
 
-export async function clearAll(): Promise<void> {
-  const db = await openDb();
-  if (db) {
-    try {
-      await tx(db, STATE_STORE, 'readwrite', (s) => s.clear());
-      await tx(db, SNAP_STORE, 'readwrite', (s) => s.clear());
-      await tx(db, SCENARIO_STORE, 'readwrite', (s) => s.clear());
-    } catch {
-      /* ignore */
-    }
-  }
-  try {
-    localStorage.removeItem(LS_STATE);
-    localStorage.removeItem(LS_SNAPS);
-  } catch {
-    /* ignore */
-  }
-}
-
 /** Serialise a full-plant backup file. */
 export function backupJson(state: HubState): string {
-  return JSON.stringify({ kind: 'multi-factory-hub-backup', exportedAt: new Date().toISOString(), state }, null, 2);
+  return JSON.stringify({ kind: 'multi-factory-hub-backup', appVersion: APP_VERSION, exportedAt: new Date().toISOString(), state }, null, 2);
 }
 
 /** Parse a full-plant backup (or a bare HubState) and migrate it. */
-export function parseBackup(text: string, fallback: HubState): HubState {
-  const j = JSON.parse(text);
-  const raw = j?.kind === 'multi-factory-hub-backup' ? j.state : j;
+export function parseBackup(text: string, fallback: HubState, fileName = 'Backup file'): HubState {
+  const j = parseJsonText(text, fileName) as { kind?: string; state?: HubState } | null;
+  const raw = (j?.kind === 'multi-factory-hub-backup' ? j.state : j) as HubState | null;
   if (!raw || !Array.isArray(raw.passports) || !Array.isArray(raw.bom)) throw new Error('Not a Multi-Factory Hub backup file');
   return migrateState(raw, fallback);
 }

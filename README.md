@@ -1,4 +1,6 @@
-# Multi-Factory Master Capacity, Services & Simulation Hub (MVP)
+# Multi-Factory Master Control Hub v1.0
+
+*Multi-Factory Master Capacity, Services & Simulation Hub — release 1.0.0.*
 
 An offline-first **React + TypeScript + Vite + Tailwind CSS** application, the **Multi-Factory Master Control Hub**. It brings together 40–50+ **Cell Design Passports** across factories **F1–F4**, and owns the **5-Level BOM**, the **Master Schedule** and the **BOM ↔ Cell Route** mapping. From these it rolls every cell's micro-routes up into simulation-ready **Cell Macro-Blocks**.
 
@@ -11,14 +13,14 @@ The whole application builds to a single self-contained file, `dist-offline/inde
 ```bash
 npm ci
 npm run dev             # http://localhost:5173
-npm test                # 163 unit tests (Vitest)
+npm test                # 192 unit tests (Vitest)
 npm run build:offline   # → dist-offline/index.html (single file, zero external CDNs)
 npm run samples         # regenerate example input files under samples/
 ```
 
 Open `dist-offline/index.html` in any modern browser. The hub starts with a realistic baseline (described below), so every workspace, chart and export works straight away.
 
-## Navigation: four lifecycle phases (V1.3)
+## Navigation: four lifecycle phases
 
 There is no sidebar any more. The top bar shows four phase tabs, and each phase has its own row of view pills:
 
@@ -31,13 +33,13 @@ There is no sidebar any more. The top bar shows four phase tabs, and each phase 
 
 The workspaces described below sit within these phases.
 
-**Executive View / Full Engineering (V1.4).**
+**Executive View / Full Engineering.**
 - **Toggle:** a top-bar toggle switches between the two modes, and the choice is remembered.
 - **Executive View:** shows only Factory Control Hub, IDEF0 / Swimlane Map, Static Scenario Planner, Siemens Plant Simulation, Fixed Process ECR Pack and Spec Sheets. Phase 2 is hidden.
 - **Full Engineering:** shows all 15 views.
 - **Switching:** jumping to an engineering-only view, for example from a Next Action, switches to Full Engineering automatically.
 
-**⬆ Smart Import (V1.4).** The header button opens a universal drop-zone. Drop any `.json`, `.xlsx` or `.csv` and `src/engine/smartimport.ts` detects what it is, shows a confidence, the reason and any alternatives, then opens the matching preview with the file already loaded:
+**⬆ Smart Import.** The header button opens a universal drop-zone. Drop any `.json`, `.xlsx` or `.csv` and `src/engine/smartimport.ts` detects what it is, shows a confidence, the reason and any alternatives, then opens the matching preview with the file already loaded:
 
 | Detected | Opens |
 |---|---|
@@ -49,7 +51,7 @@ The workspaces described below sit within these phases.
 | DES results | Generic DES validation |
 | Full-Plant Backup | Restore, after confirmation and an automatic snapshot |
 
-**Guided Next Actions (V1.4).** A compact strip at the top of the Factory Control Hub ranks the most important actions (`src/engine/nextactions.ts`). It draws on the Ingestion Audit, Fixed Process Drift and Logic Integrity engines, plus capacity, utility and space checks:
+**Guided Next Actions.** A compact strip at the top of the Factory Control Hub ranks the most important actions (`src/engine/nextactions.ts`). It draws on the Ingestion Audit, Fixed Process Drift and Logic Integrity engines, plus capacity, utility and space checks:
 - **Critical:** unmapped BOM nodes, compliance deviations, gate-blocked cells.
 - **Warning:** bottlenecks, Red utilities, factories over their floor ceiling, integrity errors.
 - **Information:** drifts awaiting justification, ECR-ready drifts, baseline sign-off.
@@ -67,10 +69,10 @@ The baseline includes a newly ingested `F4-C08 / RT-CIR-200-IS` route whose BOM 
 | 1 | **Factory Control Hub** | `All Plants / F1–F4` filter. Shows Total CapEx £ (cells plus shared plant) and Footprint m² (8 m² fixed + 20% variable cell uplift, then 35% circulation). Also covers average utilisation, OEE, TEEP and PCE (VA / NVA / ENVA), **Stores & WIP working capital** and footprint including stores, a cell utilisation chart, the bottleneck, blocked and over-utility list, factory services RAG and the **Micro-vs-Macro Ingestion Audit**, plus compact **Logic & Data Integrity** and **Buffers, WIP & Stores** summaries. |
 | 2 | **5-Level BOM & Master Schedule** | Master Schedule editor (annual volume, Q1–Q4 split %, launch-rate overrides). Indented L1 → L5 tree with level pills, Programme filter, net/gross, quarterly gross, cumulative yield, critical-path lead time and **Cascade Bottleneck** flags. Also holds the **BOM ↔ Cell Route Linker** (auto-match, suggestions, manual override, stale detection) and the shared L5 raw material roll-up. |
 | 3 | **Ingested Cells & Macro-Routing Explorer** | Collapsible F1–F4 accordions, search, and status filters (`All / Bottleneck / Gate Blocked / Over-Utility`). Toggles between **Macro-Route View** and **Micro-Route Drill-Down**. Shows Machine / Labour / Tooling constraint tags and resource utilisation. Includes the **What-If Shift/CapEx solver**, which can apply its result to the passport as a new revision. |
-| 4 | **Facility & Cell Services Specifier** | 1-click **Cell Facilities & CapEx Spec Sheet** (`.csv` / `.png` / `.json`) covering kW, compressed air, extraction, crane tonnes, coolant/water, footprint and CapEx. Also a **factory-level services balance** (cell demand + shared plant vs installed capacity, RAG) with editable capacities and shared plant. Since V1.3 the spec sheet sits under *Phase 4 · Spec Sheets*, and the **Buffers, WIP & Stores** panel (four tiers, every WIP buffer, space against each floor ceiling) under *Phase 2 · Buffers & Stores*. |
+| 4 | **Facility & Cell Services Specifier** | 1-click **Cell Facilities & CapEx Spec Sheet** (`.csv` / `.png` / `.json`) covering kW, compressed air, extraction, crane tonnes, coolant/water, footprint and CapEx. Also a **factory-level services balance** (cell demand + shared plant vs installed capacity, RAG) with editable capacities and shared plant. The spec sheet sits under *Phase 4 · Spec Sheets*, and the **Buffers, WIP & Stores** panel (four tiers, every WIP buffer, space against each floor ceiling) under *Phase 2 · Buffers & Stores*. |
 | 5 | **Master Data & Workforce Matrix** | Batch multi-file **Cell Passport** drop-zone with a re-ingestion demo. Editable Asset, Fixture and Skill/Role catalogues, and the **0–3 competence matrix**. A SheetJS **Catalogue Importer** (fuzzy column matching, `.json` mapping profiles, *Merge/Upsert* vs *Replace Unreferenced*). The **Smart Legacy Workbook Importer**, and the Dictionary defaults (including relocation and stores settings). It also holds the **Logic & Data Integrity** check and the **Baseline Governance & Audit Log**. |
-| 6 | **Plant Simulation / DES Export & Validation** | Flat **DES Routing & Schedule tables** (CSV / JSON / bundle) built from folded Macro-Operations. A source selector exports either the Live Baseline or any Workspace 7 scenario. DES result re-import with **AGREE / DISAGREE** flags and buffer-queue monitoring. Includes a **Siemens Tecnomatix Plant Simulation** preset (see V1.2 below). |
-| 7 | **Static Scenario Planner & Cause-Effect Studio (V1.1)** | Copy-on-write scenarios (Baseline vs Scenario A/B/C…), three structural comparison modes (Cell vs Cells, Asset vs Asset Load, Route vs Route), one-click stress-test presets, a side-by-side comparison matrix with delta badges, the **Key Effects & Possible Causes** diagnostic chain, report export (.csv / .json / print) and **Promote Scenario to Live Baseline**. See below. |
+| 6 | **Plant Simulation / DES Export & Validation** | Flat **DES Routing & Schedule tables** (CSV / JSON / bundle) built from folded Macro-Operations. A source selector exports either the Live Baseline or any Workspace 7 scenario. DES result re-import with **AGREE / DISAGREE** flags and buffer-queue monitoring. Includes a **Siemens Tecnomatix Plant Simulation** preset (see *Buffers, WIP & Stores · Tecnomatix preset · Governance* below). |
+| 7 | **Static Scenario Planner & Cause-Effect Studio** | Copy-on-write scenarios (Baseline vs Scenario A/B/C…), three structural comparison modes (Cell vs Cells, Asset vs Asset Load, Route vs Route), one-click stress-test presets, a side-by-side comparison matrix with delta badges, the **Key Effects & Possible Causes** diagnostic chain, report export (.csv / .json / print) and **Promote Scenario to Live Baseline**. See below. |
 
 ## Three-tier digital thread
 
@@ -141,7 +143,7 @@ Contribution margin and depreciation years can be edited in the Dictionary.
 
 **Export.** The comparison report downloads as `.csv` or `.json`, or opens as a print-friendly HTML summary. **→ Export to DES** sends any scenario to Workspace 6.
 
-## V1.2: Buffers, WIP & Stores · Tecnomatix preset · Governance
+## Buffers, WIP & Stores · Tecnomatix preset · Governance
 
 ### Buffers, WIP & Stores
 The engine is in `src/engine/stores.ts`. It models four storage tiers across F1–F4, all driven by the exploded BOM, the route mappings and the folded Macro-Blocks:
@@ -190,7 +192,7 @@ The engine is in `src/engine/stores.ts`. It models four storage tiers across F1�
 - **Starvation and blocking:** waiting above 20% flags starvation; blocking above 10% flags blocking. Each flag lists causes such as the in-feed buffer and its upstream cell's utilisation, or a full out-feed buffer and the downstream cell.
 
 ### Logic & Data Integrity
-The check is in `src/engine/integrity.ts`, shown under Master Data → *Logic & Data Integrity*, with a summary in Workspace 1. It reconciles BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services across 32 checks (28 from V1.2 plus 4 Fixed Process checks added in V1.3):
+The check is in `src/engine/integrity.ts`, shown under *Phase 1 · Logic & Data Integrity*, with a summary on the Factory Control Hub. It reconciles Fixed Process ↔ BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services across 32 checks:
 - **BOM:** circular BOM links, orphaned parent IDs, duplicate lines, level jumps, unscheduled L1s.
 - **Routing:** unmapped Make nodes, mappings to missing cells or routes, Buy parts that are mapped, dual-source shares that don't sum to 100%, orphan routes.
 - **Ops:** ops referencing missing machines or tooling, and macro overrides pointing at missing routes.
@@ -214,7 +216,7 @@ The baseline's deliberate exceptions show up as 1 error and 3 warnings.
 - **Scenario sign-off:** scenarios have their own sign-off. Editing an approved scenario returns it to Draft.
 - **Audit log:** the structured log records timestamp, action, actor, version from → to, status and details. It survives restores and resets, and exports as `.csv` or `.json`.
 
-### V1.4 logic-link tightening in Workspace 7
+### Logic-link tightening in Workspace 7
 - **Cell vs Cells space table:** shows *Cells + circulation m²*, *Stores & buffers m²* and *Total m² vs floor ceiling* per factory (`factorySpaceRows`). This is the same total as the Workspace 1 footprint tile and the Buffers & Stores space balance.
 - **Effective OEE override:** the Route vs Route Macro-Block override takes an optional **Effective OEE %**. The route's machine load is re-expressed at each asset's OEE, so the macro-block cap and the cell's utilisation stay consistent.
 - **Quick shift selector:** a **Shift Pattern** selector (1 / 2 / 3 shifts) recruits or releases a matching shift crew, so the Competent Labour ≥ 2 cap scales with the pattern.
@@ -226,7 +228,7 @@ Master Data → Dictionary Defaults now also exposes:
 - **Payback inputs:** contribution margin and depreciation years.
 - **Stores dictionary:** days of cover, units and m² per location for each tier, the WIP z-score, OEE CV%, conversion £/min, and working days per week.
 
-## V1.3: Fixed Process governance · IDEF0 system map
+## Fixed Process governance · IDEF0 system map
 
 ### Interactive IDEF0 / Swimlane System Map (Phase 1)
 The map is an SVG process and data-flow diagram, defined in `src/engine/systemmap.ts` and drawn by `src/components/SystemMap.tsx`.
@@ -290,7 +292,7 @@ One click compiles every **approved** working-design drift into the pack:
 
 It exports as `.xlsx` (5 sheets), as `.csv`, or as a print-ready HTML sign-off pack. *Issue & lock next revision* feeds the pack back through the revision diff, so the approved drifts fall back into alignment. Every export is audited as `ECR pack issued`.
 
-## V1.5: Alias Dictionary & "Needs Data Action" feedback loop
+## Alias Dictionary & "Needs Data Action" feedback loop
 
 **Alias Dictionary.** `state.aliases` maps incoming nicknames to canonical IDs. It is edited in *Phase 2 → Assets & Workforce Skills → Alias Dictionary*, persisted in IndexedDB and included in Full-Plant JSON backups. It covers four domains:
 
@@ -430,15 +432,14 @@ The `samples/` folder holds ready-made inputs for each importer:
 ```
 src/engine/     types, bom, rollup, mapping, ingest, model (audit/KPIs/services),
                 services (spec sheet), des, importer, legacy, whatif, scenario (Workspace 7),
-                stores (V1.2), tecnomatix (V1.2), integrity (V1.2), governance (V1.2),
-                fixedprocess (V1.3), systemmap (V1.3),
-                smartimport / nextactions / navigation (V1.4), aliases (V1.5),
+                stores, tecnomatix, integrity, governance, fixedprocess, systemmap,
+                smartimport, nextactions, navigation, aliases, version,
                 sheet (SheetJS), csv
 src/data/       deterministic F1–F4 baseline
 src/store/      IndexedDB/localStorage persistence + React context
 src/components/ UI primitives, utilisation chart, ingestion audit panel
-src/workspaces/ the seven workspaces + FixedProcess and EcrRelease (V1.3)
-tests/          Vitest unit tests (engine, importers, persistence, terminology)
+src/workspaces/ the seven workspaces + FixedProcess and EcrRelease
+tests/          Vitest unit tests (engine, importers, persistence, terminology, v1.0 release hardening)
 scripts/        sample-file generator
 ```
 

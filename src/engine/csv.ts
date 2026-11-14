@@ -48,3 +48,16 @@ export function parseCsv(text: string): Record<string, string>[] {
   const [header, ...body] = nonEmpty;
   return body.map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i] ?? ''])));
 }
+
+/**
+ * Parse an uploaded JSON file with a friendly, user-facing error (file name + reason) instead of a raw
+ * `SyntaxError`, and reject empty files explicitly.
+ */
+export function parseJsonText(text: string, fileName: string): unknown {
+  if (!text.trim()) throw new Error(`${fileName} is empty — nothing to import`);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${fileName} is not valid JSON (${(e as Error).message})`);
+  }
+}

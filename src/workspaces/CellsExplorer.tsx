@@ -7,7 +7,7 @@ import { applyLevers, evaluateWhatIf, solveWhatIf, whatIfContext, type WhatIfLev
 import { useHub } from '../store/HubContext';
 import { DataQualityBadge, PunchList, exportNormalised, useDataQuality } from '../components/DataQuality';
 
-/** Per-cell Data Quality Score, source punch-list and 1-click normalised passport export (V1.5). */
+/** Per-cell Data Quality Score, source punch-list and 1-click normalised passport export. */
 function CellDataQualityCard({ cellId }: { cellId: string }) {
   const { state } = useHub();
   const dqMap = useDataQuality();

@@ -33,18 +33,23 @@ export function SmartImportModal({ onClose, onNavigate }: { onClose: () => void;
   const inspect = async (files: File[]) => {
     setBusy(true);
     const f = files[0];
-    const d = detectFile(f.name, await f.arrayBuffer());
-    setFile(f);
-    setDet(d);
-    setKind(d.kind);
-    setBusy(false);
+    try {
+      const d = detectFile(f.name, await f.arrayBuffer());
+      setFile(f);
+      setDet(d);
+      setKind(d.kind);
+    } catch (e) {
+      notify(`Could not inspect ${f.name}: ${(e as Error).message}`, 'critical');
+    } finally {
+      setBusy(false);
+    }
   };
   const open = async () => {
     if (!file || kind === 'unknown') return;
     if (kind === 'backup') {
       if (!confirm(`Restore full-plant backup “${file.name}”?\n\n${det?.summary}\n\nThe current state is snapshotted first and the restore is audited.`)) return;
       try {
-        const next = parseBackup(await file.text(), buildSeedState());
+        const next = parseBackup(await file.text(), buildSeedState(), file.name);
         replaceState(next, `Restore ${file.name} (Smart Import)`, 'Backup restore');
         notify(`Restored ${file.name} — previous state snapshotted`, 'good');
         onNavigate('governance');

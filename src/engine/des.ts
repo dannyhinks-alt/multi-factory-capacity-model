@@ -1,6 +1,6 @@
 import type { HubModel } from './model';
 import type { DesResult, Dictionary, HubState } from './types';
-import { parseCsv } from './csv';
+import { parseCsv, parseJsonText } from './csv';
 
 /** One flat row of the Plant Simulation / DES routing & schedule table (one folded macro-operation). */
 export interface DesRoutingRow extends Record<string, unknown> {
@@ -158,8 +158,8 @@ export function compareDes(model: HubModel, results: DesResult[], settings: Dict
 export function parseDesResults(text: string, fileName: string): DesResult[] {
   let rows: Record<string, unknown>[];
   if (fileName.toLowerCase().endsWith('.json')) {
-    const j = JSON.parse(text);
-    rows = Array.isArray(j) ? j : j.results ?? [];
+    const j = parseJsonText(text, fileName) as any;
+    rows = (Array.isArray(j) ? j : j?.results ?? []).filter((r: unknown) => r && typeof r === 'object');
   } else rows = parseCsv(text);
   const pick = (r: Record<string, unknown>, ...keys: string[]) => {
     for (const k of Object.keys(r)) if (keys.includes(k.toLowerCase().replace(/[^a-z]/g, ''))) return r[k];

@@ -64,7 +64,7 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
   const colourOf = (id: string) => SCENARIO_COLOURS[Math.max(0, scenarios.findIndex((s) => s.id === id)) % SCENARIO_COLOURS.length];
   const nextName = () => `Scenario ${String.fromCharCode(65 + (scenarios.length % 26))}`;
 
-  // Inline name entry (V1.5) replaces window.prompt() for create / clone / rename.
+  // Inline name entry replaces window.prompt() for create / clone / rename.
   const [naming, setNaming] = useState<{ mode: 'create' | 'clone' | 'rename'; sourceId: string; value: string } | null>(null);
   const commitName = () => {
     if (!naming) return;

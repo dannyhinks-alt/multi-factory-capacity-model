@@ -54,7 +54,7 @@ describe('Baseline Change Governance', () => {
     expect(e.status).toBe('Draft');
     expect(e.log.some((l) => l.text.includes('Sign-off reset'))).toBe(true);
   });
-  it('migrates pre-V1.2 state with dictionary, governance and unit costs', () => {
+  it('migrates legacy state with dictionary, governance and unit costs', () => {
     const old = JSON.parse(JSON.stringify(seed));
     delete old.governance;
     delete old.settings.stores;

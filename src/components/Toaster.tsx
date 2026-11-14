@@ -7,7 +7,7 @@ const STYLE = {
   critical: { bg: '#fbe3e3', fg: '#8f1f1f', border: '#d03b3b', icon: '✕' },
 } as const;
 
-/** Non-blocking status toast banners (V1.5) — replace native window.alert(). */
+/** Non-blocking status toast banners — replace native window.alert(). */
 export function Toaster() {
   const { toasts, dismissToast } = useHub();
   if (!toasts.length) return null;

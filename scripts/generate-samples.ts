@@ -70,7 +70,7 @@ writeFileSync(
 writeFileSync(join(out, 'fixed-process-rev-C.xlsx'), Buffer.from(writeWorkbook([{ name: 'Fixed_Process', rows: baselineRows(state.fixedProcess!.steps) }])));
 const pack = buildEcrPack(state, reconcile(state), computeModel(state), 'Sample', 'v1.0', '2026-11-01T09:00:00.000Z');
 writeFileSync(join(out, 'fixed-process-ATLAS-rev-D.csv'), toCsv(baselineRows(ecrToSteps(pack, '2026-12-01'))));
-// V1.5 alias samples: a passport using only known nicknames (auto-ingests, flagged Needs Data Action)
+// Alias samples: a passport using only known nicknames (auto-ingests, flagged Needs Data Action)
 // and one with near-duplicate typos (preview asks to “Map & Remember Alias”).
 const nick = structuredClone(cellA);
 nick.cellId = 'Cell_A';

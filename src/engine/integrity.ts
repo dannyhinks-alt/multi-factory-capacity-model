@@ -1,5 +1,5 @@
 /**
- * Logic & Data Integrity Check (V1.2): live reconciliation of the end-to-end digital thread
+ * Logic & Data Integrity Check: live reconciliation of the end-to-end digital thread
  *   BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services,
  * flagging orphaned IDs, unmapped nodes, circular BOM links and missing skill / utility links.
  */
@@ -67,7 +67,7 @@ export function checkIntegrity(state: HubState, model: HubModel): IntegrityRepor
   const cellIds = new Set(state.passports.map((p) => p.cellId));
   const byLine = new Map(state.bom.map((b) => [b.lineId, b]));
 
-  // --- Fixed Process ↔ BOM / Working Routes (V1.3)
+  // --- Fixed Process ↔ BOM / Working Routes
   const fp = state.fixedProcess;
   const bomParts = new Set(state.bom.map((b) => b.partId));
   add('fp-parts', 'Fixed Process', 'Fixed Process steps for parts not in the BOM (orphaned IDs)', 'warning', [...new Set((fp?.steps ?? []).filter((s) => !bomParts.has(s.bomPartId)).map((s) => `${s.docId} ${s.bomPartId}`))]);

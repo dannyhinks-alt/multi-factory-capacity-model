@@ -1,4 +1,4 @@
-/** 4-phase lifecycle navigation model (V1.3) with Executive / Full Engineering modes (V1.4). */
+/** 4-phase lifecycle navigation model with Executive / Full Engineering modes. */
 import type { ViewId } from './systemmap';
 
 export interface ViewDef {
@@ -12,7 +12,7 @@ export interface PhaseDef {
   views: ViewDef[];
 }
 
-/** Simplified 4-phase lifecycle navigation (V1.3). */
+/** Simplified 4-phase lifecycle navigation. */
 export const PHASES: PhaseDef[] = [
   {
     n: 1,

@@ -671,7 +671,7 @@ export function buildSeedState(): HubState {
   };
   state.tecnomatixStats = [];
   state.fixedProcess = buildSeedFixedProcess(passports, mappings, now);
-  // V1.5 Alias Dictionary: nicknames seen in incoming Cell Passports → canonical IDs.
+  // Alias Dictionary: nicknames seen in incoming Cell Passports → canonical IDs.
   state.aliases = [
     { domain: 'cell', alias: 'Cell_A', canonical: 'CELL-A', source: 'seed', createdAt: now, note: 'Cell Design Passport app default naming' },
     { domain: 'cell', alias: 'CNC Cell 01', canonical: 'CELL-A', source: 'seed', createdAt: now },

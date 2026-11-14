@@ -1,5 +1,5 @@
 /**
- * Alias Dictionary & "Needs Data Action" feedback loop (V1.5).
+ * Alias Dictionary & "Needs Data Action" feedback loop.
  *
  * Incoming Cell Passports often carry nicknames or typos ("Cell_A", "CEL-D", "DMU-50-1"). The persistent
  * Alias Dictionary maps nicknames to canonical IDs across four domains (cells, BOM parts / variants,
@@ -11,6 +11,7 @@ import { levenshtein } from './importer';
 import { ingestPassports, normalisePassport, type IngestReport } from './ingest';
 import { normaliseId } from './mapping';
 import type { HubModel } from './model';
+import { APP_NAME, APP_VERSION_LABEL } from './version';
 import type { AliasDomain, AliasEntry, AppliedAlias, CellPassport, HubState } from './types';
 
 export const ALIAS_DOMAINS: AliasDomain[] = ['cell', 'part', 'asset', 'tooling'];
@@ -300,7 +301,7 @@ export function normalisedPassport(state: HubState, cellId: string, dq?: CellDat
     ...clean,
     normalisation: {
       exportedAt: now,
-      exportedBy: 'Multi-Factory Master Control Hub',
+      exportedBy: `${APP_NAME} ${APP_VERSION_LABEL}`,
       aliasesReplaced: (ingestNotes?.aliasesApplied ?? []).map((a) => ({ field: a.field, was: a.from, official: a.to })),
       dataQualityScore: dq?.score,
       openPunchList: (dq?.issues ?? []).map((i) => i.text),
