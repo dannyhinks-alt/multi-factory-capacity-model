@@ -1,6 +1,7 @@
 import type { HubState } from '../engine/types';
 import type { Scenario } from '../engine/scenario';
 import { DEFAULT_DICTIONARY } from '../engine/settings';
+import { defaultGovernance } from '../engine/governance';
 
 export const DB_NAME = 'multi-factory-hub-v1';
 const STATE_STORE = 'state';
@@ -77,11 +78,27 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     ...fallback,
     ...r,
     version: 1,
-    settings: { ...DEFAULT_DICTIONARY, ...(r.settings ?? {}), complexityPct: { ...DEFAULT_DICTIONARY.complexityPct, ...(r.settings?.complexityPct ?? {}) } },
+    settings: {
+      ...DEFAULT_DICTIONARY,
+      ...(r.settings ?? {}),
+      complexityPct: { ...DEFAULT_DICTIONARY.complexityPct, ...(r.settings?.complexityPct ?? {}) },
+      stores: {
+        ...DEFAULT_DICTIONARY.stores,
+        ...(r.settings?.stores ?? {}),
+        tiers: { ...DEFAULT_DICTIONARY.stores.tiers, ...(r.settings?.stores?.tiers ?? {}) },
+      },
+    },
+    governance: r.governance ?? defaultGovernance(),
+    tecnomatixStats: r.tecnomatixStats ?? [],
+    // Pre-V1.2 data: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
+    bom: r.governance ? r.bom : r.bom.map((b) => (b.unitCostGbp === undefined && b.level === 5 ? { ...b, unitCostGbp: fallback.bom.find((x) => x.partId === b.partId)?.unitCostGbp } : b)),
     desResults: r.desResults ?? [],
     mappingProfiles: r.mappingProfiles ?? fallback.mappingProfiles,
     ingestLog: r.ingestLog ?? [],
-    utilities: (r.utilities ?? fallback.utilities).map((u) => ({ ...u, floorAreaM2: u.floorAreaM2 ?? fallback.utilities.find((f) => f.factory === u.factory)?.floorAreaM2 })),
+    utilities: (r.utilities ?? fallback.utilities).map((u) => {
+      const fb = fallback.utilities.find((f) => f.factory === u.factory)?.floorAreaM2;
+      return { ...u, floorAreaM2: r.governance ? u.floorAreaM2 ?? fb : Math.max(u.floorAreaM2 ?? 0, fb ?? 0) || undefined };
+    }),
   } as HubState;
 }
 

@@ -10,6 +10,7 @@ import MasterData from './workspaces/MasterData';
 import DesExport from './workspaces/DesExport';
 import ScenarioPlanner from './workspaces/ScenarioPlanner';
 import { buildSeedState } from './data/seed';
+import { VersionBadge } from './components/Governance';
 
 export type WorkspaceId = 'hub' | 'bom' | 'cells' | 'services' | 'master' | 'des' | 'scenarios';
 
@@ -26,6 +27,8 @@ const WORKSPACES: { id: WorkspaceId; n: number; label: string; short: string }[]
 export interface NavTarget {
   ws: WorkspaceId;
   cellId?: string;
+  /** Sub-tab to open (e.g. Master Data → 'integrity' / 'governance'). */
+  tab?: string;
 }
 
 export default function App() {
@@ -38,6 +41,7 @@ export default function App() {
     }
   });
   const [focusCell, setFocusCell] = useState<string | undefined>();
+  const [focusTab, setFocusTab] = useState<string | undefined>();
   const [showSnaps, setShowSnaps] = useState(false);
   const restoreRef = useRef<HTMLInputElement>(null);
 
@@ -52,13 +56,14 @@ export default function App() {
   const navigate = (t: NavTarget) => {
     setWs(t.ws);
     setFocusCell(t.cellId);
+    setFocusTab(t.tab);
     window.scrollTo({ top: 0 });
   };
 
   const onRestore = async (f: File) => {
     try {
       const next = parseBackup(await f.text(), buildSeedState());
-      replaceState({ ...next, ingestLog: [{ at: new Date().toISOString(), kind: 'restore', message: `Restored full-plant backup ${f.name}` }, ...next.ingestLog] }, `Restore ${f.name}`);
+      replaceState({ ...next, ingestLog: [{ at: new Date().toISOString(), kind: 'restore', message: `Restored full-plant backup ${f.name}` }, ...next.ingestLog] }, `Restore ${f.name}`, 'Backup restore');
     } catch (e) {
       alert(`Restore failed: ${(e as Error).message}`);
     }
@@ -108,6 +113,7 @@ export default function App() {
               {WORKSPACES.find((w) => w.id === ws)?.n}. {WORKSPACES.find((w) => w.id === ws)?.label}
             </h1>
             <div className="ml-auto flex flex-wrap items-center gap-2">
+              <VersionBadge onClick={() => navigate({ ws: 'master', tab: 'governance' })} />
               <Button onClick={() => download(`multi-factory-hub-backup-${new Date().toISOString().slice(0, 10)}.json`, backupJson(state), 'application/json')} title="1-click full-plant JSON backup">
                 ⬇ Backup
               </Button>
@@ -130,7 +136,7 @@ export default function App() {
                           <div className="truncate text-xs text-slate-800">{s.label}</div>
                           <div className="text-[10px] text-slate-500">{new Date(s.at).toLocaleString('en-GB')}</div>
                         </div>
-                        <Button onClick={() => { replaceState(s.state, `Rollback to ${s.label}`); setShowSnaps(false); }}>Restore</Button>
+                        <Button onClick={() => { replaceState(s.state, `Rollback to ${s.label}`, 'Snapshot rollback'); setShowSnaps(false); }}>Restore</Button>
                       </div>
                     ))}
                   </div>
@@ -147,7 +153,7 @@ export default function App() {
           {ws === 'bom' && <BomSchedule navigate={navigate} />}
           {ws === 'cells' && <CellsExplorer focusCell={focusCell} />}
           {ws === 'services' && <ServicesSpecifier focusCell={focusCell} />}
-          {ws === 'master' && <MasterData />}
+          {ws === 'master' && <MasterData key={focusTab ?? 'default'} initialTab={focusTab} />}
           {ws === 'des' && <DesExport navigate={navigate} />}
           {ws === 'scenarios' && <ScenarioPlanner navigate={navigate} />}
         </main>

@@ -20,6 +20,20 @@ export const DEFAULT_DICTIONARY: Dictionary = {
   desBufferLimit: 25,
   contributionMarginGbp: 450,
   depreciationYears: 10,
+  relocationRiggingPct: 5,
+  recommissioningGbp: 15000,
+  stores: {
+    tiers: {
+      RM: { daysCover: 10, unitsPerLocation: 40, m2PerLocation: 1.8 },
+      KIT: { daysCover: 2, unitsPerLocation: 12, m2PerLocation: 2.5 },
+      WIP: { daysCover: 0, unitsPerLocation: 20, m2PerLocation: 1.5 },
+      FG: { daysCover: 3, unitsPerLocation: 2, m2PerLocation: 4 },
+    },
+    safetyZ: 1.65,
+    oeeVariabilityCvPct: 15,
+    conversionGbpPerMin: 1.2,
+    workingDaysPerWeek: 5,
+  },
 };
 
 export const COMPLEXITY_CLASSES: ComplexityClass[] = ['A', 'B', 'C', 'D', 'E'];

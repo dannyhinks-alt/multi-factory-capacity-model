@@ -1,6 +1,7 @@
 import { ancestorsOf, explodeBom, type BomExplosion } from './bom';
 import { demandByRoute, routeKey } from './mapping';
 import { factoryFootprint, rollUpCell, type CellMacroBlock } from './rollup';
+import { computeStores, type StoresModel } from './stores';
 import { addServices, SERVICE_KEYS, ZERO_SERVICES } from './settings';
 import type { CellPassport, FactoryId, HubState, RouteMapping, ServiceVector } from './types';
 import { FACTORIES } from './types';
@@ -64,6 +65,11 @@ export interface FactoryKpis {
   assetFootprintM2: number;
   cellFootprintM2: number;
   factoryFootprintM2: number;
+  /** Buffers, WIP & Stores floor area (m², aisles included) and working capital tied up (£). */
+  storesFootprintM2: number;
+  workingCapitalGbp: number;
+  /** Cells incl. circulation + stores & buffers. */
+  totalFootprintM2: number;
   avgUtilisationPct: number;
   avgOeePct: number;
   avgTeepPct: number;
@@ -82,6 +88,7 @@ export interface HubModel {
   lineStatus: Map<string, BomLineStatus>;
   audit: IngestionAudit;
   services: FactoryServicesBalance[];
+  stores: StoresModel;
 }
 
 /**
@@ -216,7 +223,8 @@ export function computeModel(state: HubState): HubModel {
   };
 
   const services = FACTORIES.map((f) => servicesBalance(f, cells, state));
-  return { explosion, cells, cellById, lineStatus, audit, services };
+  const stores = computeStores(state, explosion, cells);
+  return { explosion, cells, cellById, lineStatus, audit, services, stores };
 }
 
 /**
@@ -270,6 +278,9 @@ export function factoryKpis(model: HubModel, state: HubState, scope: FactoryId |
     assetFootprintM2: cells.reduce((s, c) => s + c.assetFootprintM2, 0),
     cellFootprintM2: cells.reduce((s, c) => s + c.totalFootprintM2, 0),
     factoryFootprintM2,
+    storesFootprintM2: factories.reduce((s, f) => s + model.stores.byFactory[f].footprintM2, 0),
+    workingCapitalGbp: factories.reduce((s, f) => s + model.stores.byFactory[f].workingCapitalGbp, 0),
+    totalFootprintM2: factoryFootprintM2 + factories.reduce((s, f) => s + model.stores.byFactory[f].footprintM2, 0),
     avgUtilisationPct: avg(active.filter((c) => Number.isFinite(c.utilisationPct)).map((c) => c.utilisationPct)),
     avgOeePct: avg(cells.map((c) => c.effectiveOeePct)),
     avgTeepPct: avg(cells.map((c) => c.teepPct)),

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AuditPanel } from '../components/AuditPanel';
+import { GovernancePanel, IntegrityPanel } from '../components/Governance';
 import { Badge, Button, Card, DropZone, Pills, download, fmtNum, input, td, tdNum, th } from '../components/ui';
 import { toCsv } from '../engine/csv';
 import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyColumnMapping, type ImportMode, type MergeReport } from '../engine/importer';
@@ -7,14 +8,14 @@ import { ingestPassports, type IngestReport } from '../engine/ingest';
 import { LEGACY_FIELDS, applyLegacy, convertLegacy, mapLegacyColumns, type LegacyConversion } from '../engine/legacy';
 import { COMPLEXITY_CLASSES } from '../engine/settings';
 import { readWorkbook, writeWorkbook, type SheetData } from '../engine/sheet';
-import type { Asset, CellPassport, Competence, Dictionary, Fixture, HubState, ImportTarget, SkillRole } from '../engine/types';
-import { FACTORIES } from '../engine/types';
+import type { Asset, CellPassport, Competence, Dictionary, Fixture, HubState, ImportTarget, SkillRole, StoreTier } from '../engine/types';
+import { FACTORIES, STORE_TIER_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
 
-type Tab = 'assets' | 'fixtures' | 'skills' | 'workforce' | 'import' | 'passports' | 'legacy' | 'dictionary';
+type Tab = 'assets' | 'fixtures' | 'skills' | 'workforce' | 'import' | 'passports' | 'legacy' | 'dictionary' | 'integrity' | 'governance';
 
-export default function MasterData() {
-  const [tab, setTab] = useState<Tab>('passports');
+export default function MasterData({ initialTab }: { initialTab?: string }) {
+  const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'passports');
   const { state } = useHub();
   return (
     <>
@@ -30,6 +31,8 @@ export default function MasterData() {
           { value: 'import', label: 'Catalogue Importer' },
           { value: 'legacy', label: 'Smart Legacy Workbook Importer' },
           { value: 'dictionary', label: 'Dictionary Defaults' },
+          { value: 'integrity', label: 'Logic & Data Integrity' },
+          { value: 'governance', label: 'Baseline Governance & Audit Log' },
         ]}
       />
       {tab === 'assets' && <AssetsTable />}
@@ -40,6 +43,8 @@ export default function MasterData() {
       {tab === 'passports' && <PassportIngest />}
       {tab === 'legacy' && <LegacyImporter />}
       {tab === 'dictionary' && <DictionaryEditor />}
+      {tab === 'integrity' && <IntegrityPanel />}
+      {tab === 'governance' && <GovernancePanel />}
     </>
   );
 }
@@ -623,6 +628,12 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
       <span className="flex items-center gap-1"><input type="number" className={`${input} w-20 text-right`} value={s[key] as number} onChange={(e) => set({ [key]: +e.target.value } as Partial<Dictionary>)} />{suffix}</span>
     </label>
   );
+  const storeNum = (label: string, key: 'safetyZ' | 'oeeVariabilityCvPct' | 'conversionGbpPerMin' | 'workingDaysPerWeek', suffix = '') => (
+    <label className="flex items-center justify-between gap-2 text-xs text-slate-700">
+      <span>{label}</span>
+      <span className="flex items-center gap-1"><input type="number" step="any" className={`${input} w-20 text-right`} value={s.stores[key]} onChange={(e) => set({ stores: { ...s.stores, [key]: +e.target.value } })} />{suffix}</span>
+    </label>
+  );
   const body = (
     <div className="space-y-2">
       {num('Weeks per year', 'weeksPerYear')}
@@ -647,6 +658,31 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           {num('DES buffer queue limit', 'desBufferLimit', 'units')}
           {num('Contribution margin per top Assembly (scenario payback)', 'contributionMarginGbp', '£')}
           {num('Depreciation period (unit conversion cost)', 'depreciationYears', 'yrs')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Scenario relocation defaults (Workspace 7)</div>
+          {num('Relocation rigging / transport (% of asset CapEx)', 'relocationRiggingPct', '%')}
+          {num('Recommissioning per relocated / merged cell', 'recommissioningGbp', '£')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Buffers, WIP & Stores</div>
+          {storeNum('WIP safety z-score (1.65 ≈ 95%)', 'safetyZ')}
+          {storeNum('OEE variability (CV %)', 'oeeVariabilityCvPct', '%')}
+          {storeNum('Conversion cost per work-content minute', 'conversionGbpPerMin', '£/min')}
+          {storeNum('Working days per week', 'workingDaysPerWeek', 'days')}
+          <table className="w-full">
+            <thead><tr><th className={th}>Tier</th><th className={`${th} text-right`}>Days cover</th><th className={`${th} text-right`}>Units / location</th><th className={`${th} text-right`}>m² / location</th></tr></thead>
+            <tbody>
+              {(['RM', 'KIT', 'WIP', 'FG'] as StoreTier[]).map((t) => (
+                <tr key={t}>
+                  <td className={`${td} text-[11px]`}>{STORE_TIER_NAMES[t]}</td>
+                  {(['daysCover', 'unitsPerLocation', 'm2PerLocation'] as const).map((k) => (
+                    <td key={k} className={tdNum}>
+                      {t === 'WIP' && k === 'daysCover' ? <span className="text-[10px] text-slate-400">sized</span> : (
+                        <input type="number" step="any" className={`${input} w-16 text-right`} value={s.stores.tiers[t][k]} onChange={(e) => set({ stores: { ...s.stores, tiers: { ...s.stores.tiers, [t]: { ...s.stores.tiers[t], [k]: Math.max(0, +e.target.value) } } } })} />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
     </div>

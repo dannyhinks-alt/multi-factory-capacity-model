@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { buildSeedState } from '../data/seed';
 import { computeModel, type HubModel } from '../engine/model';
-import type { HubState } from '../engine/types';
+import type { AuditAction, HubState, SignOffStatus } from '../engine/types';
+import { carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
 import { deleteScenarioStore, listSnapshots, loadScenarios, loadState, migrateState, pushSnapshot, saveScenario, saveState, type Snapshot } from './persistence';
 import { createScenario, editScenario, LIVE_ID, type Scenario } from '../engine/scenario';
 
@@ -14,7 +15,11 @@ interface HubCtx {
   snapshots: Snapshot[];
   /** Apply a state transition; `label` marks it as significant (auto-snapshot candidate). */
   update: (fn: (s: HubState) => HubState, label?: string) => void;
-  replaceState: (s: HubState, label: string) => void;
+  replaceState: (s: HubState, label: string, action?: AuditAction) => void;
+  /** V1.2 governance */
+  signOffLive: (status: SignOffStatus, note?: string) => void;
+  setCurrentUser: (name: string) => void;
+  setScenarioStatus: (id: string, status: SignOffStatus) => void;
   snapshotNow: (label: string) => Promise<void>;
   resetToBaseline: () => void;
   /** Workspace 7 scenarios — each holds an isolated copy of the hub state. */
@@ -80,7 +85,11 @@ export function HubProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback((fn: (s: HubState) => HubState, label?: string) => {
     if (label) pendingLabel.current = label;
-    setState((s) => ({ ...fn(s), updatedAt: new Date().toISOString() }));
+    // Labelled (significant) edits invalidate a Reviewed / Approved baseline (governance).
+    setState((s) => {
+      const next = fn(s);
+      return { ...(label ? markEdited(next, label) : next), updatedAt: new Date().toISOString() };
+    });
   }, []);
 
   const snapshotNow = useCallback(async (label: string) => {
@@ -88,13 +97,24 @@ export function HubProvider({ children }: { children: ReactNode }) {
     setSnapshots(await pushSnapshot(state, label));
   }, [state]);
 
-  const replaceState = useCallback((s: HubState, label: string) => {
+  const replaceState = useCallback((s: HubState, label: string, action: AuditAction = 'Snapshot rollback') => {
     void pushSnapshot(state, `Before: ${label}`).then(setSnapshots);
     lastSnap.current = Date.now();
-    setState({ ...s, updatedAt: new Date().toISOString() });
+    // Keep one continuous audit trail across restores, rollbacks and resets.
+    const carried = carryGovernance(state, s);
+    const audited = recordAudit(carried, action, label, { bump: action === 'Snapshot rollback' ? 'minor' : 'major', status: 'Draft' });
+    setState({ ...audited, updatedAt: new Date().toISOString() });
   }, [state]);
 
-  const resetToBaseline = useCallback(() => replaceState(buildSeedState(), 'Reset to baseline'), [replaceState]);
+  const resetToBaseline = useCallback(() => replaceState(buildSeedState(), 'Reset to F1–F4 seed baseline', 'Reset to seed'), [replaceState]);
+
+  const signOffLive = useCallback((status: SignOffStatus, note = '') => {
+    setState((s) => ({ ...signOff(s, status, governanceOf(s).currentUser, note), updatedAt: new Date().toISOString() }));
+  }, []);
+
+  const setCurrentUser = useCallback((name: string) => {
+    setState((s) => ({ ...s, governance: { ...governanceOf(s), currentUser: name || 'Planner' } }));
+  }, []);
 
   const persistScenario = (sc: Scenario) => void saveScenario(sc);
 
@@ -142,13 +162,29 @@ export function HubProvider({ children }: { children: ReactNode }) {
     setSnapshots(await pushSnapshot(state, `Before promoting scenario “${sc.name}”`));
     lastSnap.current = Date.now();
     const at = new Date().toISOString();
-    setState({ ...sc.state, updatedAt: at, ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${sc.log.length} changes)` }, ...state.ingestLog].slice(0, 200) });
+    const promoted: HubState = { ...sc.state, governance: governanceOf(state), updatedAt: at, ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${sc.log.length} changes)` }, ...state.ingestLog].slice(0, 200) };
+    setState(recordAudit(promoted, 'Baseline promotion', `Scenario “${sc.name}” (${sc.status ?? 'Draft'}, ${sc.log.length - 1} changes, based on ${sc.basedOn}) promoted to Live Baseline`, {
+      bump: 'major',
+      status: sc.status === 'Approved Baseline' ? 'Approved Baseline' : 'Draft',
+      at,
+    }));
+  }, [state]);
+
+  const setScenarioStatus = useCallback((id: string, status: SignOffStatus) => {
+    const actor = governanceOf(state).currentUser;
+    const at = new Date().toISOString();
+    commitScenarios(scenariosRef.current.map((sc) => {
+      if (sc.id !== id) return sc;
+      const next = { ...sc, status, signedOffBy: status === 'Draft' ? undefined : actor, signedOffAt: status === 'Draft' ? undefined : at, log: [{ at, text: `Sign-off: ${sc.status ?? 'Draft'} → ${status} by ${actor}` }, ...sc.log] };
+      persistScenario(next);
+      return next;
+    }));
   }, [state]);
 
   const model = useMemo(() => computeModel(state), [state]);
 
   return (
-    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId }}>
+    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId }}>
       {children}
     </Ctx.Provider>
   );

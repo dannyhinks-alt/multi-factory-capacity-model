@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
-import { Badge, Button, Card, DropZone, FactoryFilter, Stat, download, fmtNum, fmtPct, input, td, tdNum, th } from '../components/ui';
+import { Badge, Button, Card, DropZone, FactoryFilter, Pills, Stat, download, fmtNum, fmtPct, input, td, tdNum, th } from '../components/ui';
 import { computeModel } from '../engine/model';
+import { TecnomatixPanel } from '../components/TecnomatixPanel';
 import { LIVE_ID } from '../engine/scenario';
 import { toCsv } from '../engine/csv';
 import { buildDesRouting, buildDesSchedule, compareDes, parseDesResults, sampleDesResults } from '../engine/des';
@@ -16,6 +17,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
   const state = source ? { ...source.state, desResults: liveState.desResults } : liveState;
   const [scope, setScope] = useState<FactoryId | 'All'>('All');
   const [msg, setMsg] = useState('');
+  const [preset, setPreset] = useState<'generic' | 'tecnomatix'>('generic');
   const routing = useMemo(() => buildDesRouting(model).filter((r) => scope === 'All' || r.factory === scope), [model, scope]);
   const schedule = useMemo(() => buildDesSchedule(routing), [routing]);
   const comparison = useMemo(() => compareDes(model, state.desResults, state.settings).filter((c) => scope === 'All' || c.factory === scope), [model, state.desResults, state.settings, scope]);
@@ -55,6 +57,13 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
         </div>
         <div className="text-xs text-slate-500">Analytic utilisation tolerance ± {state.settings.desTolerancePct} pp · buffer limit {state.settings.desBufferLimit}</div>
       </div>
+      <Pills
+        value={preset}
+        onChange={setPreset}
+        label="Export preset"
+        options={[{ value: 'generic', label: 'Generic DES (CSV / JSON)' }, { value: 'tecnomatix', label: 'Siemens Tecnomatix Plant Simulation' }]}
+      />
+      {preset === 'tecnomatix' ? <TecnomatixPanel model={model} state={state} sourceName={source ? source.name : 'Live Baseline'} navigate={navigate} /> : (<>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Micro-steps folded" value={fmtNum(microOps)} sub="from Cell Passports" />
         <Stat label="DES macro-operations" value={fmtNum(routing.length)} sub={`${routing.length ? (microOps / routing.length).toFixed(1) : 0} : 1 fold`} />
@@ -154,6 +163,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
           </div>
         </Card>
       </div>
+      </>)}
     </>
   );
 }

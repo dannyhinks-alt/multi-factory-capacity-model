@@ -11,7 +11,7 @@ The whole application builds to a single self-contained file, `dist-offline/inde
 ```bash
 npm ci
 npm run dev             # http://localhost:5173
-npm test                # 85 unit tests (Vitest)
+npm test                # 110 unit tests (Vitest)
 npm run build:offline   # → dist-offline/index.html (single file, zero external CDNs)
 npm run samples         # regenerate example input files under samples/
 ```
@@ -22,12 +22,12 @@ Open `dist-offline/index.html` in any modern browser. The hub starts with a real
 
 | # | Workspace | Highlights |
 |---|-----------|-----------|
-| 1 | **Factory Control Hub** | `All Plants / F1–F4` filter. Shows Total CapEx £ (cells plus shared plant) and Footprint m² (8 m² fixed + 20% variable cell uplift, then 35% circulation). Also covers average utilisation, OEE, TEEP and PCE (VA / NVA / ENVA), a cell utilisation chart, the bottleneck, blocked and over-utility list, factory services RAG and the **Micro-vs-Macro Ingestion Audit**. |
+| 1 | **Factory Control Hub** | `All Plants / F1–F4` filter. Shows Total CapEx £ (cells plus shared plant) and Footprint m² (8 m² fixed + 20% variable cell uplift, then 35% circulation). Also covers average utilisation, OEE, TEEP and PCE (VA / NVA / ENVA), **Stores & WIP working capital** and footprint including stores, a cell utilisation chart, the bottleneck, blocked and over-utility list, factory services RAG and the **Micro-vs-Macro Ingestion Audit**, plus compact **Logic & Data Integrity** and **Buffers, WIP & Stores** summaries. |
 | 2 | **5-Level BOM & Master Schedule** | Master Schedule editor (annual volume, Q1–Q4 split %, launch-rate overrides). Indented L1 → L5 tree with level pills, Programme filter, net/gross, quarterly gross, cumulative yield, critical-path lead time and **Cascade Bottleneck** flags. Also holds the **BOM ↔ Cell Route Linker** (auto-match, suggestions, manual override, stale detection) and the shared L5 raw material roll-up. |
 | 3 | **Ingested Cells & Macro-Routing Explorer** | Collapsible F1–F4 accordions, search, and status filters (`All / Bottleneck / Gate Blocked / Over-Utility`). Toggles between **Macro-Route View** and **Micro-Route Drill-Down**. Shows Machine / Labour / Tooling constraint tags and resource utilisation. Includes the **What-If Shift/CapEx solver**, which can apply its result to the passport as a new revision. |
-| 4 | **Facility & Cell Services Specifier** | 1-click **Cell Facilities & CapEx Spec Sheet** (`.csv` / `.png` / `.json`) covering kW, compressed air, extraction, crane tonnes, coolant/water, footprint and CapEx. Also a **factory-level services balance** (cell demand + shared plant vs installed capacity, RAG) with editable capacities and shared plant. |
-| 5 | **Master Data & Workforce Matrix** | Batch multi-file **Cell Passport** drop-zone with a re-ingestion demo. Editable Asset, Fixture and Skill/Role catalogues, and the **0–3 competence matrix**. A SheetJS **Catalogue Importer** (fuzzy column matching, `.json` mapping profiles, *Merge/Upsert* vs *Replace Unreferenced*). The **Smart Legacy Workbook Importer**, and the Dictionary defaults. |
-| 6 | **Plant Simulation / DES Export & Validation** | Flat **DES Routing & Schedule tables** (CSV / JSON / bundle) built from folded Macro-Operations. A source selector exports either the Live Baseline or any Workspace 7 scenario. DES result re-import with **AGREE / DISAGREE** flags and buffer-queue monitoring. |
+| 4 | **Facility & Cell Services Specifier** | 1-click **Cell Facilities & CapEx Spec Sheet** (`.csv` / `.png` / `.json`) covering kW, compressed air, extraction, crane tonnes, coolant/water, footprint and CapEx. Also a **factory-level services balance** (cell demand + shared plant vs installed capacity, RAG) with editable capacities and shared plant. A **Buffers, WIP & Stores** panel covers the four storage tiers and every WIP buffer, and checks factory space (cells + circulation + stores) against each floor ceiling. |
+| 5 | **Master Data & Workforce Matrix** | Batch multi-file **Cell Passport** drop-zone with a re-ingestion demo. Editable Asset, Fixture and Skill/Role catalogues, and the **0–3 competence matrix**. A SheetJS **Catalogue Importer** (fuzzy column matching, `.json` mapping profiles, *Merge/Upsert* vs *Replace Unreferenced*). The **Smart Legacy Workbook Importer**, and the Dictionary defaults (including relocation and stores settings). It also holds the **Logic & Data Integrity** check and the **Baseline Governance & Audit Log**. |
+| 6 | **Plant Simulation / DES Export & Validation** | Flat **DES Routing & Schedule tables** (CSV / JSON / bundle) built from folded Macro-Operations. A source selector exports either the Live Baseline or any Workspace 7 scenario. DES result re-import with **AGREE / DISAGREE** flags and buffer-queue monitoring. Includes a **Siemens Tecnomatix Plant Simulation** preset (see V1.2 below). |
 | 7 | **Static Scenario Planner & Cause-Effect Studio (V1.1)** | Copy-on-write scenarios (Baseline vs Scenario A/B/C…), three structural comparison modes (Cell vs Cells, Asset vs Asset Load, Route vs Route), one-click stress-test presets, a side-by-side comparison matrix with delta badges, the **Key Effects & Possible Causes** diagnostic chain, report export (.csv / .json / print) and **Promote Scenario to Live Baseline**. See below. |
 
 ## Three-tier digital thread
@@ -99,6 +99,85 @@ Contribution margin and depreciation years can be edited in the Dictionary.
 
 **Export.** The comparison report downloads as `.csv` or `.json`, or opens as a print-friendly HTML summary. **→ Export to DES** sends any scenario to Workspace 6.
 
+## V1.2: Buffers, WIP & Stores · Tecnomatix preset · Governance
+
+### Buffers, WIP & Stores
+The engine is in `src/engine/stores.ts`. It models four storage tiers across F1–F4, all driven by the exploded BOM, the route mappings and the folded Macro-Blocks:
+
+| Tier | Contents | Located at | Sizing |
+|---|---|---|---|
+| **RM** | Raw Material & Bought-Out Stores (L5) | Goods-in of the consuming cell's factory | daily gross × days of cover (default 10) |
+| **KIT** | Kitting / Marshalling Zones (L2–L4 Make parts) | Kitting zone of the producing cell | daily demand × days of cover (default 2); valued at component material cost |
+| **WIP** | Inter-Cell WIP Buffers / Line-Side Supermarkets | Line-side at the consuming cell; cross-factory links flagged | Recommended size = **batch + setup cover + safety** (below) |
+| **FG** | Finished Goods & Despatch Staging (L1) | Despatch staging | daily demand × days of cover (default 3) |
+
+**Recommended WIP buffer size.**
+- **Replenishment time** T = setup + batch × bottleneck cycle ÷ OEE.
+- **Setup cover** = demand rate × setup minutes.
+- **Safety** = z (1.65) × CV(OEE) (15%) × demand rate × T.
+- **Initial WIP** = setup cover + safety.
+- **Dwell time** = average WIP ÷ rate (Little's law).
+
+**Per-item outputs.** Every item reports:
+- **Days of Cover**
+- **locations / stillages**: stock ÷ units per location
+- **Stores Footprint m²**: locations × m² per location, aisles included
+- **Working Capital Tied Up £**: stock × standard cost. Standard cost is the L5 unit cost, rolled up the BOM with qty per, plus route work content × £1.20/min conversion, grossed up for scrap.
+
+**Where it shows up.**
+- **Workspace 1:** a Stores & WIP tile, and footprint including stores.
+- **Workspace 4:** the space balance checks cells + circulation + stores against each factory's floor-area ceiling.
+- **Workspace 7:** matrix rows for *Stores & buffer footprint* and *Working capital tied up*, the space-ceiling check, and a **Stores** cause-effect chain (tier deltas and resized buffers, e.g. batch halving shrinks WIP).
+
+### Siemens Tecnomatix Plant Simulation preset (Workspace 6)
+**Source.** Choose the source (Live Baseline or any Workspace 7 scenario). Then switch the preset to *Siemens Tecnomatix Plant Simulation*.
+
+**Export.** Download all four DataTables as one `.xlsx`, or as `.csv` / `.json`:
+- **`Routing_DataTable`:** MU, Station_Path (`.Models.Plant.<F>.<Cell>.Station`), batch, setup and processing seconds, Availability %, MTTR, station quantity, and the next buffer / station or the despatch Drain.
+- **`ProductionPlan_DataTable`:** Source path, quarter, quantity, batches and interval in seconds.
+- **`ShiftCalendar_DataTable`:** Early / Late / Night shifts from each passport's shift pattern.
+- **`Buffer_DataTable`:** `Buffer_ID`, `Station_Path`, `Capacity_Units`, `Initial_WIP`, `Dwell_Time_Sec`, plus the upstream and downstream stations.
+
+**Statistics import.** Import Station / Buffer / Drain statistics:
+- **Columns:** `StatWorkingTime`, `StatBlockingTime`, `StatWaitingTime`, `StatThroughput`.
+- **Formats:** CSV, TSV, semicolon-separated or JSON; values can be fractions or %.
+
+**Validation rules.**
+- **Stations:** AGREE when StatWorkingTime is within ± 5 pp of MIN(analytic utilisation, 100%).
+- **Drain:** AGREE when StatThroughput is within ± 5% of analytic throughput.
+- **Starvation and blocking:** waiting above 20% flags starvation; blocking above 10% flags blocking. Each flag lists causes such as the in-feed buffer and its upstream cell's utilisation, or a full out-feed buffer and the downstream cell.
+
+### Logic & Data Integrity
+The check is in `src/engine/integrity.ts`, shown under Master Data → *Logic & Data Integrity*, with a summary in Workspace 1. It reconciles BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services across 28 checks:
+- **BOM:** circular BOM links, orphaned parent IDs, duplicate lines, level jumps, unscheduled L1s.
+- **Routing:** unmapped Make nodes, mappings to missing cells or routes, Buy parts that are mapped, dual-source shares that don't sum to 100%, orphan routes.
+- **Ops:** ops referencing missing machines or tooling, and macro overrides pointing at missing routes.
+- **Master data:** catalogue gaps, operators with unknown roles, skills no operator holds, skills missing from the catalogue.
+- **Stores:** buffers whose producer or consumer cell is missing, and L5 items with no unit cost.
+- **Services:** utility or floor ceilings missing for services in demand, and machines with zero kW.
+
+The baseline's deliberate exceptions show up as 1 error and 3 warnings.
+
+### Baseline Change Governance
+- **Version badge:** `Baseline vMAJOR.MINOR` with its sign-off status (**Draft → Reviewed → Approved Baseline**) appears in the header and links to the audit log.
+- **Version rules:**
+
+  | Event | Version | Sign-off |
+  |---|---|---|
+  | Cell Passport re-ingestion, Master Data import, legacy import, or a significant live edit | minor +1 | reset to Draft |
+  | Scenario promotion, backup restore or reset | major +1 | — |
+  | A promoted scenario that was Approved | — | becomes the Approved Baseline |
+  | Sign-off | no change | changes as signed off |
+
+- **Scenario sign-off:** scenarios have their own sign-off. Editing an approved scenario returns it to Draft.
+- **Audit log:** the structured log records timestamp, action, actor, version from → to, status and details. It survives restores and resets, and exports as `.csv` or `.json`.
+
+### Editable Dictionary defaults
+Master Data → Dictionary Defaults now also exposes:
+- **Relocation:** rigging % (default 5%) and recommissioning £ per cell (default £15,000). Both drive Workspace 7's relocation and merge CapEx.
+- **Payback inputs:** contribution margin and depreciation years.
+- **Stores dictionary:** days of cover, units and m² per location for each tier, the WIP z-score, OEE CV%, conversion £/min, and working days per week.
+
 ## Calculation rules
 
 All core functions in `src/engine/` carry JSDoc comments.
@@ -169,12 +248,14 @@ The `samples/` folder holds ready-made inputs for each importer:
 - `master-data.xlsx` and the master-list CSVs
 - `legacy-capacity-bom.xlsx`
 - `des-results.csv`
+- `plantsim-statistics.csv`
 
 ## Data safety
 
 - **Autosave:** state saves to **IndexedDB** (`multi-factory-hub-v1`), with a `localStorage` fallback.
 - **Snapshots:** the hub keeps **5 rolling auto-snapshots**, taken on significant changes (at most one a minute) and before any restore or reset. You can roll back from the *Snapshots* menu.
 - **Backup:** *Backup* / *Restore* write and read a full-plant `.json` backup in one click.
+- **Governance:** the baseline version, sign-off status and structured audit log are part of the saved state and the full-plant backup.
 - **Scenarios:** Workspace 7 scenarios are kept in their own IndexedDB store (`scenarios`, schema v2) and survive reloads. Promoting one snapshots the live state first.
 
 ## Project structure
@@ -182,6 +263,7 @@ The `samples/` folder holds ready-made inputs for each importer:
 ```
 src/engine/     types, bom, rollup, mapping, ingest, model (audit/KPIs/services),
                 services (spec sheet), des, importer, legacy, whatif, scenario (Workspace 7),
+                stores (V1.2), tecnomatix (V1.2), integrity (V1.2), governance (V1.2),
                 sheet (SheetJS), csv
 src/data/       deterministic F1–F4 baseline
 src/store/      IndexedDB/localStorage persistence + React context

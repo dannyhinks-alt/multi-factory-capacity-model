@@ -42,7 +42,18 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - **Side-by-side comparison matrix** (Throughput, Utilisation %, Bottleneck count, Peak-quarter overloads, CapEx £, Incremental investment, Unit Conversion Cost £, Payback years, Footprint m², Utility & space overruns, OEE, TEEP, PCE) with delta badges, plus the automated **"Key Effects & Possible Causes"** diagnostic chain (binding-constraint shifts, L2–L5 scrap/material ripple, schedule changes, F1–F4 utility/space threshold triggers, gate changes, cost drivers).
    - Export the comparison report (`.csv` / `.json` / print-friendly HTML) and send any scenario straight into Workspace 6 (DES Export) via its source selector.
 
-## 4. Data Safety & Offline Single-File Build
-- Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
+## 4. V1.2 Extensions: Buffers, WIP & Stores · Tecnomatix Preset · Governance
+1. **Buffers, WIP & Stores Engine** (linked to BOM, Cells, Footprint & Scenarios):
+   - 4 storage tiers across `F1–F4`: **Raw Material & Bought-Out Stores (L5)**, **Kitting/Marshalling Zones (L2–L4)**, **Inter-Cell WIP Buffers / Line-Side Supermarkets**, **Finished Goods & Despatch Staging (L1)**.
+   - Recommended inter-cell WIP buffer = batch + setup cover + OEE-variability safety (z × CV(OEE) × demand rate × replenishment time); plus **Days of Cover**, storage locations/stillages, **Stores Footprint (m²)** and **Working Capital Tied Up (£)** (standard cost rolled up the BOM: L5 unit cost + route work content × conversion £/min).
+   - Rolled into Workspace 1 (Stores & WIP tile, footprint incl. stores), Workspace 4 (Buffers, WIP & Stores panel; space = cells + circulation + stores vs floor ceiling) and Workspace 7 (matrix rows + `Stores` cause-effect chain).
+2. **Siemens Tecnomatix Plant Simulation preset (Workspace 6):** 1-click `Routing_DataTable`, `ProductionPlan_DataTable`, `ShiftCalendar_DataTable`, `Buffer_DataTable` (`Buffer_ID`, `Station_Path`, `Capacity_Units`, `Initial_WIP`, `Dwell_Time_Sec`) as `.xlsx` / `.csv` / `.json` from the Live Baseline or any Workspace 7 scenario; import Station/Buffer/Drain statistics (`StatWorkingTime`, `StatBlockingTime`, `StatWaitingTime`, `StatThroughput`) → `AGREE` / `DISAGREE` plus buffer starvation / blocking causes.
+3. **Logic Integrity, Governance & Editable Dictionary:**
+   - Relocation rigging % and per-cell recommissioning £ editable in Master Data → Dictionary Defaults (with contribution margin, depreciation years and the stores dictionary).
+   - Live **Logic & Data Integrity Check**: BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services (orphaned IDs, unmapped nodes, circular BOM links, missing skill/utility links).
+   - **Baseline Change Governance:** version badge (`vMAJOR.MINOR`), sign-off status (`Draft` / `Reviewed` / `Approved Baseline`) for the baseline and each scenario, and a structured **Audit Log** of baseline promotions, Cell Passport re-ingestions, Master Data / legacy imports, sign-offs, restores and resets.
+
+## 5. Data Safety & Offline Single-File Build
+- Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios + governance audit log in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
 - Include `README.md`, JSDoc comments on core calculation functions, and `.github/workflows/ci.yml`.
 - Bundle everything locally with zero external CDNs (`npm run build:offline` → `dist-offline/index.html`) and force-add `dist-offline/index.html` to Git.
