@@ -5,6 +5,24 @@ import type { FactoryId } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES } from '../engine/types';
 import { applyLevers, evaluateWhatIf, solveWhatIf, whatIfContext, type WhatIfLevers, type WhatIfResult } from '../engine/whatif';
 import { useHub } from '../store/HubContext';
+import { DataQualityBadge, PunchList, exportNormalised, useDataQuality } from '../components/DataQuality';
+
+/** Per-cell Data Quality Score, source punch-list and 1-click normalised passport export (V1.5). */
+function CellDataQualityCard({ cellId }: { cellId: string }) {
+  const { state } = useHub();
+  const dqMap = useDataQuality();
+  const dq = dqMap.get(cellId);
+  if (!dq) return null;
+  return (
+    <div className={`rounded border p-3 ${dq.needsAction ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-white'}`}>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">Data Quality <DataQualityBadge dq={dq} /></div>
+        <Button onClick={() => exportNormalised(state, dqMap, [cellId])}>⬇ Export Normalised Passport (.json)</Button>
+      </div>
+      <PunchList dq={dq} />
+    </div>
+  );
+}
 
 type StatusFilter = 'all' | 'bottleneck' | 'blocked' | 'overutil';
 
@@ -93,6 +111,7 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
 
 function CellRow({ cell: c, expanded, onToggle }: { cell: CellMacroBlock; expanded: boolean; onToggle: () => void }) {
   const { state } = useHub();
+  const dq = useDataQuality().get(c.cellId);
   const s = state.settings;
   return (
     <div id={`cell-${c.cellId}`} className={`border-b border-slate-100 ${expanded ? 'bg-slate-50/60' : ''}`}>
@@ -107,6 +126,7 @@ function CellRow({ cell: c, expanded, onToggle }: { cell: CellMacroBlock; expand
           <Badge tone={statusTone(c.status)}>{c.status}</Badge>
           {c.gateStatus !== 'PASSED' && <Badge tone={statusTone(c.gateStatus)} title={c.gateIssues.map((g) => g.message).join('; ')}>Gate {c.gateStatus.toLowerCase()}</Badge>}
           {c.overUtility && <Badge tone="serious">Over-utility</Badge>}
+          {dq?.needsAction && <DataQualityBadge dq={dq} />}
         </div>
         <div className="col-span-3 md:col-span-1 text-right text-xs tabular-nums text-slate-600">{c.routes.length} routes<br />{c.rawMicroOps} ops</div>
         <div className="col-span-3 md:col-span-2 text-right text-xs tabular-nums text-slate-600">{fmtNum(c.annualDemand)} / {fmtNum(c.bindingCapUnits)} u/yr<br />{fmtGbp(c.totalCapexGbp)}</div>
@@ -224,6 +244,7 @@ function CellDetail({ cell: c }: { cell: CellMacroBlock }) {
           )}
         </div>
       </div>
+      <CellDataQualityCard cellId={c.cellId} />
       <WhatIf cell={c} />
     </div>
   );

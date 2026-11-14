@@ -77,7 +77,14 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Route vs Route Macro-Block editor: optional **Effective OEE %** override and quick **Shift Pattern** (1/2/3 shifts, matching crew recruited/released).
    - Dictionary Defaults governance toggle: **Require Reviewed/Approved status before promoting Scenario to Live Baseline** (enforced in the UI and in the promotion itself).
 
-## 7. Data Safety & Offline Single-File Build
-- Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios + governance audit log in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
+## 7. V1.5: Alias Dictionary, "Needs Data Action" Passport Feedback Loop & Edge-to-Edge Polish
+1. **Persistent Alias Dictionary** (`state.aliases`, Phase 2 → Assets & Workforce Skills → Alias Dictionary, included in Full-Plant JSON backups) mapping incoming nicknames to canonical IDs across 4 domains: Cell IDs (e.g. `Cell_A` → `CELL-A`), BOM Part / Variant IDs, Master Asset IDs and Master Tooling / Fixture IDs.
+   - Cell Passport ingestion & Smart Import resolve aliases and detect near-duplicate typos (case/punctuation-only differences, or ≤ 2 insertions / deletions / transpositions — not substitutions, so sibling IDs such as CELL-A / CELL-B stay distinct). **0 mismatches → silent auto-ingest**; otherwise the preview offers **Map & Remember Alias** (or Keep as new) per unrecognised ID / typo.
+   - Per-cell **Data Quality Score (%)** with a plain-English source punch-list; cells relying on aliases, fuzzy matches or missing catalogue / service fields get a **Needs Data Action** badge (Phase 1 Guided Next Actions, Phase 2 Cell Passports, Phase 3 Cells & Macro-Routing).
+   - 1-click **⬇ Export Normalised Passport (.json)** per cell and bulk export of all flagged cells — canonical IDs applied plus a `normalisation` block (aliases replaced, open punch-list) for the cell owner to load back into the Cell Design Passport app.
+2. **Edge-to-edge polish:** 4-phase button labels ("→ Export to Siemens Plant Simulation (Phase 4)", "Choose a scenario in Static Scenario Planner (Phase 3) →"); no native `window.prompt()` / `window.alert()` (inline inputs + non-blocking toast banners); Guided Next Actions deep-link sub-tabs (Dictionary Defaults, Catalogue Importer, Alias Dictionary, Live Drift); Fixed Process drift justifications can be recorded inside Scenarios and are carried over on promotion (the live locked layer stays authoritative).
+
+## 8. Data Safety & Offline Single-File Build
+- Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios + governance audit log + Alias Dictionary in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
 - Include `README.md`, JSDoc comments on core calculation functions, and `.github/workflows/ci.yml`.
 - Bundle everything locally with zero external CDNs (`npm run build:offline` → `dist-offline/index.html`) and force-add `dist-offline/index.html` to Git.

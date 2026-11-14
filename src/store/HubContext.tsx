@@ -6,6 +6,8 @@ import { canPromote, carryGovernance, governanceOf, markEdited, recordAudit, sig
 import { deleteScenarioStore, listSnapshots, loadScenarios, loadState, migrateState, pushSnapshot, saveScenario, saveState, type Snapshot } from './persistence';
 import { createScenario, editScenario, LIVE_ID, type Scenario } from '../engine/scenario';
 import type { SmartKind } from '../engine/smartimport';
+import type { ViewId } from '../engine/systemmap';
+import { mergeFixedProcessOnPromotion } from '../engine/fixedprocess';
 
 interface HubCtx {
   state: HubState;
@@ -33,11 +35,24 @@ interface HubCtx {
   /** Which state Workspace 6 (DES) exports: 'live' or a scenario ID. */
   desSourceId: string;
   setDesSourceId: (id: string) => void;
+  /** Deep-link navigation available to any panel (registered by the app shell). */
+  navigateTo: (view: ViewId, tab?: string, cellId?: string) => void;
+  registerNavigator: (fn: (view: ViewId, tab?: string, cellId?: string) => void) => void;
+  /** Non-blocking status toasts (V1.5) — replace window.alert(). */
+  toasts: Toast[];
+  notify: (message: string, tone?: Toast['tone']) => void;
+  dismissToast: (id: number) => void;
   /** Universal Smart Import hand-off (V1.4): a detected file waiting for its target view to pick it up. */
   pendingImport: PendingImport | null;
   setPendingImport: (p: PendingImport | null) => void;
   /** Consume the pending import if it is one of `kinds` (returns null otherwise). */
   takePendingImport: (kinds: SmartKind[]) => PendingImport | null;
+}
+
+export interface Toast {
+  id: number;
+  message: string;
+  tone: 'good' | 'info' | 'warning' | 'critical';
 }
 
 export interface PendingImport {
@@ -58,6 +73,19 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [desSourceId, setDesSourceId] = useState<string>(LIVE_ID);
+  const navRef = useRef<(view: ViewId, tab?: string, cellId?: string) => void>(() => undefined);
+  const registerNavigator = useCallback((fn: (view: ViewId, tab?: string, cellId?: string) => void) => {
+    navRef.current = fn;
+  }, []);
+  const navigateTo = useCallback((view: ViewId, tab?: string, cellId?: string) => navRef.current(view, tab, cellId), []);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastSeq = useRef(0);
+  const dismissToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const notify = useCallback((message: string, tone: Toast['tone'] = 'info') => {
+    const id = ++toastSeq.current;
+    setToasts((t) => [...t.slice(-3), { id, message, tone }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'critical' ? 9000 : 6000);
+  }, []);
   const [pendingImport, setPendingImportState] = useState<PendingImport | null>(null);
   const pendingRef = useRef<PendingImport | null>(null);
   const setPendingImport = useCallback((p: PendingImport | null) => {
@@ -158,12 +186,12 @@ export function HubProvider({ children }: { children: ReactNode }) {
     try {
       next = editScenario(sc, mutate);
     } catch (e) {
-      alert((e as Error).message);
+      notify((e as Error).message, 'critical');
       return;
     }
     commitScenarios(scenariosRef.current.map((s) => (s.id === id ? next : s)));
     persistScenario(next);
-  }, []);
+  }, [notify]);
 
   const renameScenario = useCallback((id: string, name: string, description?: string) => {
     commitScenarios(scenariosRef.current.map((sc) => {
@@ -190,7 +218,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
     setSnapshots(await pushSnapshot(state, `Before promoting scenario “${sc.name}”`));
     lastSnap.current = Date.now();
     const at = new Date().toISOString();
-    const promoted: HubState = { ...sc.state, governance: governanceOf(state), updatedAt: at, ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${sc.log.length} changes)` }, ...state.ingestLog].slice(0, 200) };
+    const promoted: HubState = { ...sc.state, governance: governanceOf(state), fixedProcess: mergeFixedProcessOnPromotion(state.fixedProcess, sc.state.fixedProcess), updatedAt: at, ingestLog: [{ at, kind: 'scenario' as const, message: `Scenario “${sc.name}” promoted to Live Baseline (${sc.log.length} changes)` }, ...state.ingestLog].slice(0, 200) };
     setState(recordAudit(promoted, 'Baseline promotion', `Scenario “${sc.name}” (${sc.status ?? 'Draft'}, ${sc.log.length - 1} changes, based on ${sc.basedOn}) promoted to Live Baseline`, {
       bump: 'major',
       status: sc.status === 'Approved Baseline' ? 'Approved Baseline' : 'Draft',
@@ -212,7 +240,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const model = useMemo(() => computeModel(state), [state]);
 
   return (
-    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId, pendingImport, setPendingImport, takePendingImport }}>
+    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId, pendingImport, setPendingImport, takePendingImport, toasts, notify, dismissToast, navigateTo, registerNavigator }}>
       {children}
     </Ctx.Provider>
   );

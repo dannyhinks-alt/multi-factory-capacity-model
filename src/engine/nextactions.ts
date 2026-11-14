@@ -7,13 +7,14 @@ import type { DriftReport } from './fixedprocess';
 import { governanceOf, versionLabel } from './governance';
 import type { IntegrityReport } from './integrity';
 import { autoMatch, rankCandidates } from './mapping';
+import { cellDataQuality } from './aliases';
 import { factoryKpis, type HubModel } from './model';
 import type { ViewId } from './systemmap';
 import type { HubState, RouteMapping } from './types';
 import { FACTORIES } from './types';
 
 export type ActionSeverity = 'critical' | 'warning' | 'info';
-export type QuickFix = 'auto-match';
+export type QuickFix = 'auto-match' | 'export-normalised';
 
 export interface NextAction {
   id: string;
@@ -26,6 +27,10 @@ export interface NextAction {
   cellId?: string;
   quickFix?: QuickFix;
   quickFixLabel?: string;
+  /** Cells the quick fix applies to (e.g. flagged cells for a normalised-passport export). */
+  cellIds?: string[];
+  /** Optional second deep link (e.g. Dictionary Defaults for tolerances). */
+  secondary?: { label: string; view: ViewId; tab?: string };
 }
 
 /** Name-similarity score accepted by the 1-click Auto-Match (ID matches are always accepted). */
@@ -80,8 +85,13 @@ export function computeNextActions(state: HubState, model: HubModel, drift: Drif
   const comp = drift.items.filter((i) => i.cls === 'COMPLIANCE DEVIATION');
   if (comp.length) {
     const cells = [...new Set(comp.map((i) => i.cellId))];
-    out.push({ id: 'compliance', severity: 'critical', title: `${comp.length} Fixed Process compliance deviation${comp.length > 1 ? 's' : ''}`, detail: `${cells.slice(0, 4).join(', ')} — ${comp[0].reasons[0] ?? ''}`, count: comp.length, view: 'fixed' });
+    out.push({ id: 'compliance', severity: 'critical', title: `${comp.length} Fixed Process compliance deviation${comp.length > 1 ? 's' : ''}`, detail: `${cells.slice(0, 4).join(', ')} — ${comp[0].reasons[0] ?? ''}`, count: comp.length, view: 'fixed', tab: 'drift', secondary: { label: 'Drift tolerances', view: 'master', tab: 'dictionary' } });
   }
+  // V1.5 “Needs Data Action” feedback loop and catalogue gaps.
+  const dq = [...cellDataQuality(state, model).values()].filter((d) => d.needsAction).sort((x, y) => x.score - y.score);
+  if (dq.length) out.push({ id: 'data-action', severity: 'warning', title: `${dq.length} cell${dq.length > 1 ? 's' : ''} need data action`, detail: `${dq.slice(0, 3).map((d) => `${d.cellId} ${d.score}%`).join(' · ')} — ${dq[0].issues.find((i) => i.severity === 'action')?.text ?? 'see punch-list'}`, count: dq.length, view: 'passports', quickFix: 'export-normalised', quickFixLabel: `Export ${dq.length} normalised`, cellIds: dq.map((d) => d.cellId), secondary: { label: 'Alias Dictionary', view: 'master', tab: 'aliases' } });
+  const missingAssets = [...new Set(model.cells.flatMap((c) => c.assets.filter((x) => !x.inMaster).map((x) => x.assetId)))];
+  if (missingAssets.length) out.push({ id: 'catalogue', severity: 'warning', title: `${missingAssets.length} passport asset${missingAssets.length > 1 ? 's' : ''} missing from the Master catalogue`, detail: `${missingAssets.slice(0, 3).join(', ')} — import the asset register or add an alias`, count: missingAssets.length, view: 'master', tab: 'import', secondary: { label: 'Alias Dictionary', view: 'master', tab: 'aliases' } });
   const blocked = model.cells.filter((c) => c.gateStatus === 'BLOCKED');
   if (blocked.length) out.push({ id: 'blocked', severity: 'critical', title: `${blocked.length} gate-blocked cell${blocked.length > 1 ? 's' : ''}`, detail: blocked.map((c) => `${c.cellId}: ${c.gateIssues.find((g) => g.severity === 'BLOCKED')?.message ?? 'blocked'}`).slice(0, 2).join(' · '), count: blocked.length, view: 'cells', cellId: blocked[0].cellId });
   const bn = model.cells.filter((c) => c.status === 'Bottleneck' && c.gateStatus !== 'BLOCKED').sort((x, y) => y.utilisationPct - x.utilisationPct);
@@ -98,7 +108,7 @@ export function computeNextActions(state: HubState, model: HubModel, drift: Drif
     out.push({ id: 'integrity', severity: integrity.errors > 1 ? 'critical' : 'warning', title: `${integrity.errors} logic-integrity error${integrity.errors > 1 ? 's' : ''}`, detail: first ? `${first.link}: ${first.title}` : '', count: integrity.errors, view: 'integrity' });
   }
   const maturing = drift.items.filter((i) => (i.cls === 'MATURING DRIFT' || i.cls === 'NEW LOCAL STEP') && !i.justification);
-  if (maturing.length) out.push({ id: 'drift', severity: 'info', title: `${maturing.length} drift${maturing.length > 1 ? 's' : ''} awaiting justification`, detail: 'Justify and approve to adopt them in the next Fixed Process revision', count: maturing.length, view: 'fixed' });
+  if (maturing.length) out.push({ id: 'drift', severity: 'info', title: `${maturing.length} drift${maturing.length > 1 ? 's' : ''} awaiting justification`, detail: 'Justify and approve to adopt them in the next Fixed Process revision', count: maturing.length, view: 'fixed', tab: 'drift', secondary: { label: 'Drift tolerances', view: 'master', tab: 'dictionary' } });
   const approved = drift.items.filter((i) => i.cls !== 'ALIGNED' && i.justification?.status === 'Approved');
   if (approved.length) out.push({ id: 'ecr', severity: 'info', title: `${approved.length} approved drift${approved.length > 1 ? 's' : ''} ready for ECR`, detail: 'Compile the New Fixed Process Release / ECR Pack', count: approved.length, view: 'ecr' });
   if (a.staleMappings.length) out.push({ id: 'stale', severity: 'warning', title: `${a.staleMappings.length} stale route mapping${a.staleMappings.length > 1 ? 's' : ''}`, detail: 'Mapped route no longer exists in its Cell Passport', count: a.staleMappings.length, view: 'bom' });

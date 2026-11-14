@@ -94,6 +94,7 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     tecnomatixStats: r.tecnomatixStats ?? [],
     // Pre-V1.3 data: adopt the seeded Fixed Process Baseline (locked reference layer).
     fixedProcess: r.fixedProcess ?? fallback.fixedProcess,
+    aliases: r.aliases ?? [],
     // Pre-V1.2 data: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
     bom: r.governance ? r.bom : r.bom.map((b) => (b.unitCostGbp === undefined && b.level === 5 ? { ...b, unitCostGbp: fallback.bom.find((x) => x.partId === b.partId)?.unitCostGbp } : b)),
     desResults: r.desResults ?? [],

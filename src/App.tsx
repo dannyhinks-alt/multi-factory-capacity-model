@@ -16,6 +16,7 @@ import { GovernancePanel, IntegrityPanel, VersionBadge } from './components/Gove
 import { StoresPanel } from './components/StoresPanel';
 import { SystemMap } from './components/SystemMap';
 import { SmartImportModal } from './components/SmartImport';
+import { Toaster } from './components/Toaster';
 import type { ViewId } from './engine/systemmap';
 import { ALL_VIEWS, EXECUTIVE_VIEWS, phasesFor, resolveNav, type NavTarget, type ViewMode } from './engine/navigation';
 
@@ -26,7 +27,7 @@ export type { NavTarget, ViewMode } from './engine/navigation';
 export { PHASES, EXECUTIVE_VIEWS, phasesFor, resolveNav } from './engine/navigation';
 
 export default function App() {
-  const { ready, backend, savedAt, snapshots, state, replaceState, snapshotNow, resetToBaseline } = useHub();
+  const { ready, backend, savedAt, snapshots, state, replaceState, snapshotNow, resetToBaseline, notify, registerNavigator } = useHub();
   const [view, setView] = useState<ViewId>(() => {
     try {
       const v = localStorage.getItem('mfh:view') as ViewId;
@@ -79,12 +80,15 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
+  // Let any panel deep-link (view + sub-tab + cell) through the hub context.
+  useEffect(() => registerNavigator((v, tab, cellId) => navigate({ ws: v, tab, cellId })));
+
   const onRestore = async (f: File) => {
     try {
       const next = parseBackup(await f.text(), buildSeedState());
       replaceState({ ...next, ingestLog: [{ at: new Date().toISOString(), kind: 'restore', message: `Restored full-plant backup ${f.name}` }, ...next.ingestLog] }, `Restore ${f.name}`, 'Backup restore');
     } catch (e) {
-      alert(`Restore failed: ${(e as Error).message}`);
+      notify(`Restore failed: ${(e as Error).message}`, 'critical');
     }
   };
 
@@ -167,13 +171,14 @@ export default function App() {
           </span>
         </nav>
       </header>
+      <Toaster />
       {showImport && <SmartImportModal onClose={() => setShowImport(false)} onNavigate={(v, tab) => navigate({ ws: v, tab })} />}
       <main className="space-y-4 p-4">
         {view === 'hub' && <ControlHub navigate={navigate} />}
         {view === 'systemmap' && <SystemMap onNavigate={(v, tab) => navigate({ ws: v, tab })} />}
         {view === 'integrity' && <IntegrityPanel />}
         {view === 'governance' && <GovernancePanel />}
-        {view === 'fixed' && <FixedProcess navigate={navigate} />}
+        {view === 'fixed' && <FixedProcess key={focusTab ?? 'fixed'} navigate={navigate} initialTab={focusTab} />}
         {view === 'passports' && <MasterData mode="passports" />}
         {view === 'bom' && <BomSchedule navigate={navigate} />}
         {view === 'master' && <MasterData key={focusTab ?? 'default'} mode="catalogues" initialTab={focusTab} />}

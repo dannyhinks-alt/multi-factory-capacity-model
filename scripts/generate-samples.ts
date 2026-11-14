@@ -70,4 +70,25 @@ writeFileSync(
 writeFileSync(join(out, 'fixed-process-rev-C.xlsx'), Buffer.from(writeWorkbook([{ name: 'Fixed_Process', rows: baselineRows(state.fixedProcess!.steps) }])));
 const pack = buildEcrPack(state, reconcile(state), computeModel(state), 'Sample', 'v1.0', '2026-11-01T09:00:00.000Z');
 writeFileSync(join(out, 'fixed-process-ATLAS-rev-D.csv'), toCsv(baselineRows(ecrToSteps(pack, '2026-12-01'))));
+// V1.5 alias samples: a passport using only known nicknames (auto-ingests, flagged Needs Data Action)
+// and one with near-duplicate typos (preview asks to “Map & Remember Alias”).
+const nick = structuredClone(cellA);
+nick.cellId = 'Cell_A';
+nick.passportId = 'PP-Cell_A';
+nick.revision = 5;
+nick.assets = nick.assets.map((a) => (a.assetId === 'CELL-A-VMC5-01' ? { ...a, assetId: 'DMU-50-1' } : a));
+nick.routes.forEach((r) => r.ops.forEach((o) => {
+  if (o.assetId === 'CELL-A-VMC5-01') o.assetId = 'DMU-50-1';
+}));
+writeFileSync(join(out, 'passports', 'Cell_A_nicknames_rev5.json'), JSON.stringify(nick, null, 2));
+const typo = structuredClone(state.passports.find((p) => p.cellId === 'CELL-D')!);
+typo.cellId = 'CEL-D';
+typo.passportId = 'PP-CEL-D';
+typo.revision += 1;
+const a0 = typo.assets[0].assetId;
+typo.assets[0].assetId = a0.replace(/-0(\d)$/, '-$1');
+typo.routes.forEach((r) => r.ops.forEach((o) => {
+  if (o.assetId === a0) o.assetId = typo.assets[0].assetId;
+}));
+writeFileSync(join(out, 'passports', 'CEL-D_typo_rev.json'), JSON.stringify(typo, null, 2));
 console.log(`Samples written to ${out}`);

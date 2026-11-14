@@ -142,6 +142,34 @@ export interface CellPassport {
   crew: PassportOperator[];
   routes: PassportRoute[];
   serviceAllowance?: Partial<ServiceVector>;
+  /** V1.5 provenance: aliases / fuzzy resolutions applied when this passport was ingested. */
+  ingestNotes?: PassportIngestNotes;
+}
+
+export type AliasDomain = 'cell' | 'part' | 'asset' | 'tooling';
+
+/** Persistent alias: an incoming nickname mapped to its canonical (official) ID. */
+export interface AliasEntry {
+  domain: AliasDomain;
+  alias: string;
+  canonical: string;
+  source: 'manual' | 'preview' | 'seed';
+  createdAt: string;
+  note?: string;
+}
+
+export interface AppliedAlias {
+  domain: AliasDomain;
+  from: string;
+  to: string;
+  /** Where the ID appeared in the passport (e.g. "cellId", "assets[0].assetId"). */
+  field: string;
+}
+
+export interface PassportIngestNotes {
+  ingestedAt: string;
+  sourceFile?: string;
+  aliasesApplied: AppliedAlias[];
 }
 
 export type BomLevel = 1 | 2 | 3 | 4 | 5;
@@ -392,6 +420,8 @@ export interface HubState {
   tecnomatixStats?: TxStat[];
   /** V1.3 locked Fixed Process Baseline reference layer. */
   fixedProcess?: FixedProcessBaseline;
+  /** V1.5 persistent Alias Dictionary (nicknames → canonical IDs). */
+  aliases?: AliasEntry[];
 }
 
 // ---------------------------------------------------------------- V1.3 Fixed Process governance

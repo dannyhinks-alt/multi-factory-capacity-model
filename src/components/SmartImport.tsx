@@ -25,7 +25,7 @@ export const SMART_TARGET: Record<SmartKind, { view: ViewId; tab?: string; label
  * detects its type and opens the matching import / diff preview with the file pre-loaded.
  */
 export function SmartImportModal({ onClose, onNavigate }: { onClose: () => void; onNavigate: (view: ViewId, tab?: string) => void }) {
-  const { setPendingImport, replaceState } = useHub();
+  const { setPendingImport, replaceState, notify } = useHub();
   const [file, setFile] = useState<File | null>(null);
   const [det, setDet] = useState<Detection | null>(null);
   const [kind, setKind] = useState<SmartKind>('unknown');
@@ -46,10 +46,11 @@ export function SmartImportModal({ onClose, onNavigate }: { onClose: () => void;
       try {
         const next = parseBackup(await file.text(), buildSeedState());
         replaceState(next, `Restore ${file.name} (Smart Import)`, 'Backup restore');
+        notify(`Restored ${file.name} — previous state snapshotted`, 'good');
         onNavigate('governance');
         onClose();
       } catch (e) {
-        alert(`Restore failed: ${(e as Error).message}`);
+        notify(`Restore failed: ${(e as Error).message}`, 'critical');
       }
       return;
     }

@@ -3,7 +3,9 @@ import { AuditPanel } from '../components/AuditPanel';
 import { Badge, Button, Card, DropZone, Pills, download, fmtNum, input, td, tdNum, th } from '../components/ui';
 import { toCsv } from '../engine/csv';
 import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyColumnMapping, type ImportMode, type MergeReport } from '../engine/importer';
-import { ingestPassports, normalisePassport, type IngestReport } from '../engine/ingest';
+import type { IngestReport } from '../engine/ingest';
+import { ALIAS_DOMAIN_LABELS, addAlias, ingestWithAliases, knownIds, preparePassports, type IdCheck, type PreparedPassport } from '../engine/aliases';
+import { AliasManager, DataQualityPanel } from '../components/DataQuality';
 import { MASTER_TARGET } from '../engine/smartimport';
 import { LEGACY_FIELDS, applyLegacy, convertLegacy, mapLegacyColumns, type LegacyConversion } from '../engine/legacy';
 import { COMPLEXITY_CLASSES } from '../engine/settings';
@@ -12,7 +14,7 @@ import type { Asset, CellPassport, Competence, Dictionary, Fixture, HubState, Im
 import { FACTORIES, STORE_TIER_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
 
-type Tab = 'assets' | 'fixtures' | 'skills' | 'workforce' | 'import' | 'passports' | 'legacy' | 'dictionary' | 'integrity' | 'governance';
+type Tab = 'assets' | 'fixtures' | 'skills' | 'workforce' | 'aliases' | 'import' | 'passports' | 'legacy' | 'dictionary' | 'integrity' | 'governance';
 
 export default function MasterData({ initialTab, mode = 'catalogues' }: { initialTab?: string; mode?: 'catalogues' | 'passports' }) {
   const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'assets');
@@ -32,6 +34,7 @@ function Catalogues({ tab, setTab, state }: { tab: Tab; setTab: (t: Tab) => void
           { value: 'fixtures', label: 'Master Fixtures', count: state.fixtures.length },
           { value: 'skills', label: 'Skills / Roles', count: state.skills.length },
           { value: 'workforce', label: 'Workforce Matrix' },
+          { value: 'aliases', label: 'Alias Dictionary', count: state.aliases?.length ?? 0 },
           { value: 'import', label: 'Catalogue Importer' },
           { value: 'legacy', label: 'Smart Legacy Workbook Importer' },
           { value: 'dictionary', label: 'Dictionary Defaults' },
@@ -41,6 +44,7 @@ function Catalogues({ tab, setTab, state }: { tab: Tab; setTab: (t: Tab) => void
       {tab === 'fixtures' && <FixturesTable />}
       {tab === 'skills' && <SkillsTable />}
       {tab === 'workforce' && <WorkforceMatrix />}
+      {tab === 'aliases' && <AliasManager />}
       {tab === 'import' && <MasterImporter />}
       {tab === 'legacy' && <LegacyImporter />}
       {tab === 'dictionary' && <DictionaryEditor />}
@@ -302,8 +306,9 @@ function WorkforceMatrix() {
 
 // ---------------------------------------------------------------- Master catalogue importer
 function MasterImporter() {
-  const { state, update } = useHub();
+  const { state, update, notify } = useHub();
   const [target, setTarget] = useState<ImportTarget>('assets');
+  const [profileName, setProfileName] = useState<string | null>(null);
   const { takePendingImport, pendingImport } = useHub();
   useEffect(() => {
     const p = takePendingImport(['master-assets', 'master-fixtures', 'master-skills']);
@@ -384,9 +389,17 @@ function MasterImporter() {
                 {profiles.map((p) => <option key={p.name}>{p.name}</option>)}
               </select>
             )}
-            <Button disabled={!sheet} onClick={() => { const name = prompt('Profile name', `${target} profile ${new Date().toLocaleDateString('en-GB')}`); if (name) update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => p.name !== name), { name, target, columns: mapping }] }), 'Mapping profile saved'); }}>Save profile</Button>
+            {profileName === null ? (
+              <Button disabled={!sheet} onClick={() => setProfileName(`${target} profile ${new Date().toLocaleDateString('en-GB')}`)}>Save profile</Button>
+            ) : (
+              <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const name = profileName.trim(); if (!name) return; update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => p.name !== name), { name, target, columns: mapping }] })); notify(`Mapping profile “${name}” saved`, 'good'); setProfileName(null); }}>
+                <input autoFocus aria-label="Profile name" className={`${input} w-44`} value={profileName} onChange={(e) => setProfileName(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setProfileName(null)} />
+                <Button type="submit" variant="primary">Save</Button>
+                <Button onClick={() => setProfileName(null)}>✕</Button>
+              </form>
+            )}
             <Button disabled={!profiles.length} onClick={() => download(`mapping-profiles-${target}.json`, JSON.stringify(profiles, null, 2), 'application/json')}>⬇ Profiles</Button>
-            <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">⬆ Profiles<input type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const arr = JSON.parse(await f.text()); const list = (Array.isArray(arr) ? arr : [arr]).filter((p: any) => p?.name && p?.target && p?.columns); update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => !list.some((l: any) => l.name === p.name)), ...list] }), 'Mapping profiles imported'); } catch { alert('Invalid profile file'); } }} /></label>
+            <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">⬆ Profiles<input type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const arr = JSON.parse(await f.text()); const list = (Array.isArray(arr) ? arr : [arr]).filter((p: any) => p?.name && p?.target && p?.columns); update((s) => ({ ...s, mappingProfiles: [...s.mappingProfiles.filter((p) => !list.some((l: any) => l.name === p.name)), ...list] })); notify(`Imported ${list.length} mapping profile(s)`, 'good'); } catch { notify('Invalid mapping profile file', 'critical'); } }} /></label>
           </>
         }
       >
@@ -443,31 +456,44 @@ function MasterImporter() {
 }
 
 // ---------------------------------------------------------------- Batch passport ingestion
+type Staged = { source: string; prepared: PreparedPassport[] };
+
+/**
+ * Cell Passport ingestion (V1.5 alias-aware): every dropped / Smart-Imported passport is checked
+ * against the Alias Dictionary and catalogues. 0 mismatches → ingested silently; otherwise the preview
+ * lists each unrecognised ID / near-duplicate typo with “Map & Remember Alias”.
+ */
 function PassportIngest() {
-  const { state, update, takePendingImport, pendingImport } = useHub();
+  const { state, update, takePendingImport, pendingImport, notify, navigateTo } = useHub();
   const [report, setReport] = useState<IngestReport | null>(null);
   const [busy, setBusy] = useState(false);
-  // Smart Import hand-off: preview the detected passport file before ingesting.
-  const [preview, setPreview] = useState<{ name: string; data: unknown } | null>(null);
+  const [staged, setStaged] = useState<Staged | null>(null);
+  const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const [choice, setChoice] = useState<Record<string, string>>({});
+  const commit = (prepared: PreparedPassport[], extra: Record<string, string>, label: string, silent: boolean) => {
+    const clean = Object.fromEntries(Object.entries(extra).filter(([, v]) => v));
+    const r = ingestWithAliases(state, prepared, clean);
+    update(() => r.state, label);
+    setReport(r.report);
+    setStaged(null);
+    setResolutions({});
+    const n = r.report.added.length + r.report.updated.length;
+    notify(`${silent ? 'Auto-ingested' : 'Ingested'} ${n} passport(s)${silent ? ' — 0 ID mismatches' : ''}${r.applied.length ? `; ${r.applied.length} alias(es) resolved — affected cells flagged “Needs Data Action”` : ''}${r.report.skipped.length ? `; ${r.report.skipped.length} skipped (older revision)` : ''}`, r.report.errors.length ? 'warning' : 'good');
+  };
+  const stage = (raws: { name: string; data: unknown }[], source: string, errors: string[] = []) => {
+    const prepared = preparePassports(state, raws);
+    errors.forEach((e) => notify(e, 'critical'));
+    const mismatches = prepared.flatMap((p) => p.mismatches);
+    if (!mismatches.length && !prepared.some((p) => p.error)) return commit(prepared, {}, `Ingest ${source}`, true);
+    setStaged({ source, prepared });
+    setResolutions({});
+    setChoice({});
+  };
   useEffect(() => {
     const p = takePendingImport(['passports']);
-    if (p) void p.file.text().then((t) => setPreview({ name: p.file.name, data: JSON.parse(t) }));
+    if (p) void p.file.text().then((t) => stage([{ name: p.file.name, data: JSON.parse(t) }], `${p.file.name} (Smart Import)`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImport]);
-  const previewRows = useMemo(() => {
-    if (!preview) return [];
-    const d = preview.data as { passports?: unknown[] };
-    const list = Array.isArray(preview.data) ? preview.data : Array.isArray(d?.passports) ? d.passports : [preview.data];
-    return list.map((item) => {
-      try {
-        const { passport } = normalisePassport(item, preview.name);
-        const held = state.passports.find((x) => x.cellId === passport.cellId);
-        const action = !held ? 'Add' : held.revision > passport.revision ? 'Skip (older revision)' : 'Update';
-        return { cellId: passport.cellId, factory: passport.factory, revision: passport.revision, held: held?.revision, routes: passport.routes.length, ops: passport.routes.reduce((t, r) => t + r.ops.length, 0), action };
-      } catch (e) {
-        return { cellId: '—', factory: '', revision: 0, held: undefined, routes: 0, ops: 0, action: `Error: ${(e as Error).message}` };
-      }
-    });
-  }, [preview, state.passports]);
   const ingest = async (files: File[]) => {
     setBusy(true);
     const raws: { name: string; data: unknown }[] = [];
@@ -479,38 +505,82 @@ function PassportIngest() {
         errors.push(`${f.name}: ${(e as Error).message}`);
       }
     }
-    run(raws, errors, `Ingest ${files.length} passport file(s)`);
+    stage(raws, `${files.length} passport file(s)`, errors);
     setBusy(false);
   };
-  const run = (raws: { name: string; data: unknown }[], errors: string[], label: string) => {
-    const r = ingestPassports(state, raws);
-    update(() => r.state, label);
-    setReport({ ...r.report, errors: [...errors, ...r.report.errors] });
+  // Unique mismatches across the staged passports (one decision per domain + incoming ID).
+  const mismatches = useMemo(() => {
+    const m = new Map<string, IdCheck & { cells: string[] }>();
+    for (const p of staged?.prepared ?? []) for (const c of p.mismatches) {
+      const k = `${c.domain}|${c.incoming}`;
+      const cur = m.get(k) ?? { ...c, cells: [] };
+      cur.cells.push(p.passport?.cellId ?? '—');
+      m.set(k, cur);
+    }
+    return [...m.entries()];
+  }, [staged]);
+  const unresolved = mismatches.filter(([k]) => !(k in resolutions)).length;
+  const remember = (k: string, c: IdCheck) => {
+    const canonical = choice[k] ?? c.canonical ?? '';
+    if (!canonical) return notify('Choose the official ID to map to', 'warning');
+    update((s) => addAlias(s, { domain: c.domain, alias: c.incoming, canonical, source: 'preview', note: `From ${staged?.source}` }));
+    setResolutions((r) => ({ ...r, [k]: canonical }));
+    notify(`Alias remembered: ${c.incoming} → ${canonical}`, 'good');
   };
   const cellA = state.passports.find((p) => p.cellId === 'CELL-A');
   return (
     <>
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2" title="Batch multi-file Cell Passport ingestion" subtitle="Drop 40–50+ updated Cell Passport .json files at once. Each upserts by Cell ID (newer or equal revision wins); rolled-up metrics route automatically into their mapped Factory → Cell → BOM slot.">
+        <Card className="xl:col-span-2" title="Batch multi-file Cell Passport ingestion" subtitle="Drop 40–50+ updated Cell Passport .json files at once. IDs are resolved through the Alias Dictionary; with 0 mismatches the batch ingests silently, otherwise a preview asks you to map unrecognised IDs / typos once and remembers them.">
           <DropZone accept=".json,application/json" onFiles={ingest} label={busy ? 'Ingesting…' : 'Drop Cell Passport .json files (multi-select supported)'} hint="Single passports, arrays of passports or { passports: [...] } bundles are all accepted" />
           <div className="mt-3 flex flex-wrap gap-2">
             {cellA && <Button onClick={() => download('CELL-A_CNC-Cell-01_passport.json', JSON.stringify(cellA, null, 2), 'application/json')}>⬇ CELL-A baseline passport</Button>}
             <Button onClick={() => download('all-cell-passports.json', JSON.stringify({ passports: state.passports }, null, 2), 'application/json')}>⬇ All {state.passports.length} passports (bundle)</Button>
-            <Button onClick={() => run(demoReingest(state), [], 'Re-ingestion demo')}>▶ Simulate re-ingestion of 3 updated passports</Button>
+            <Button onClick={() => stage(demoReingest(state), 'Re-ingestion demo')}>▶ Simulate re-ingestion of 3 updated passports</Button>
+            <Button variant="ghost" onClick={() => navigateTo('master', 'aliases')}>Alias Dictionary ({state.aliases?.length ?? 0}) →</Button>
           </div>
-          {preview && (
-            <div className="mt-3 rounded border border-blue-200 bg-blue-50/50 p-3">
+          {staged && (
+            <div className="mt-3 rounded border border-amber-300 bg-amber-50/60 p-3">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span><b>Smart Import preview</b> · <span className="font-mono">{preview.name}</span> · {previewRows.length} passport(s)</span>
+                <span><b>ID check preview</b> · {staged.source} · {staged.prepared.length} passport(s) · <b>{mismatches.length}</b> unrecognised ID(s) / typo(s){unresolved ? `, ${unresolved} to decide` : ' — all resolved'}</span>
                 <span className="flex gap-2">
-                  <Button variant="primary" onClick={() => { run([preview], [], `Ingest ${preview.name} (Smart Import)`); setPreview(null); }}>Ingest {previewRows.filter((r) => r.action === 'Add' || r.action === 'Update').length} passport(s)</Button>
-                  <Button onClick={() => setPreview(null)}>Discard</Button>
+                  <Button variant="primary" disabled={unresolved > 0} onClick={() => commit(staged.prepared, resolutions, `Ingest ${staged.source}`, false)}>Ingest {staged.prepared.filter((p) => !p.error).length} passport(s)</Button>
+                  <Button onClick={() => setStaged(null)}>Discard</Button>
                 </span>
               </div>
-              <div className="max-h-56 overflow-auto scroll-thin">
+              <div className="max-h-72 overflow-auto scroll-thin">
                 <table className="w-full">
-                  <thead><tr><th className={th}>Cell</th><th className={th}>Factory</th><th className={`${th} text-right`}>Rev (file / held)</th><th className={`${th} text-right`}>Routes</th><th className={`${th} text-right`}>Micro-ops</th><th className={th}>Action</th></tr></thead>
-                  <tbody>{previewRows.map((r, i) => <tr key={i}><td className={`${td} font-mono text-[11px]`}>{r.cellId}</td><td className={td}>{r.factory}</td><td className={tdNum}>{r.revision} / {r.held ?? '—'}</td><td className={tdNum}>{r.routes}</td><td className={tdNum}>{r.ops}</td><td className={td}><Badge tone={r.action === 'Add' ? 'good' : r.action === 'Update' ? 'info' : r.action.startsWith('Error') ? 'critical' : 'neutral'}>{r.action}</Badge></td></tr>)}</tbody>
+                  <thead><tr><th className={th}>Domain</th><th className={th}>Incoming ID</th><th className={th}>Where</th><th className={th}>Finding</th><th className={th}>Official ID</th><th className={th}>Decision</th></tr></thead>
+                  <tbody>
+                    {mismatches.map(([k, c]) => {
+                      const options = [...new Set([...c.candidates, ...knownIds(state, c.domain)])];
+                      return (
+                        <tr key={k}>
+                          <td className={`${td} text-[11px]`}>{ALIAS_DOMAIN_LABELS[c.domain]}</td>
+                          <td className={`${td} font-mono text-[11px]`}>{c.incoming}</td>
+                          <td className={`${td} text-[11px]`}>{[...new Set(c.cells)].join(', ')} · {c.field}</td>
+                          <td className={td}><Badge tone={c.status === 'unknown' ? 'critical' : 'warning'}>{c.status === 'normalised' ? 'Same ID, different spelling' : c.status === 'typo' ? 'Likely typo' : 'Unrecognised'}</Badge></td>
+                          <td className={td}>
+                            <select aria-label={`Official ID for ${c.incoming}`} className={`${input} max-w-[220px]`} value={choice[k] ?? c.canonical ?? ''} onChange={(e) => setChoice((x) => ({ ...x, [k]: e.target.value }))} disabled={k in resolutions}>
+                              <option value="">— choose —</option>
+                              {options.map((o) => <option key={o} value={o}>{o}{c.candidates.includes(o) ? ' (suggested)' : ''}</option>)}
+                            </select>
+                          </td>
+                          <td className={td}>
+                            {k in resolutions ? (
+                              <Badge tone="good">{resolutions[k] ? `→ ${resolutions[k]}` : 'Kept as new'}</Badge>
+                            ) : (
+                              <span className="flex flex-wrap gap-1">
+                                <Button variant="primary" onClick={() => remember(k, c)}>Map &amp; Remember Alias</Button>
+                                {c.status === 'unknown' && <Button onClick={() => setResolutions((r) => ({ ...r, [k]: '' }))}>Keep as new</Button>}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {staged.prepared.filter((p) => p.error).map((p, i) => <tr key={`e${i}`}><td className={td} colSpan={6}><Badge tone="critical">Error</Badge> {p.sourceName}: {p.error}</td></tr>)}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -525,6 +595,7 @@ function PassportIngest() {
           </ul>
         </Card>
       </div>
+      <DataQualityPanel onCell={(id) => navigateTo('cells', undefined, id)} />
       <AuditPanel />
     </>
   );
@@ -577,7 +648,7 @@ function demoReingest(state: HubState): { name: string; data: unknown }[] {
 
 // ---------------------------------------------------------------- Smart Legacy Workbook Importer
 function LegacyImporter() {
-  const { state, update, takePendingImport, pendingImport } = useHub();
+  const { state, update, takePendingImport, pendingImport, notify } = useHub();
   useEffect(() => {
     const p = takePendingImport(['legacy']);
     if (p) void load([p.file]);
@@ -599,7 +670,7 @@ function LegacyImporter() {
       setConv(null);
       setApplied(false);
     } catch (e) {
-      alert(`Could not read workbook: ${(e as Error).message}`);
+      notify(`Could not read workbook: ${(e as Error).message}`, 'critical');
     }
   };
   return (
