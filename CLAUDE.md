@@ -17,7 +17,7 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
 4. **Smart Legacy Workbook Importer:**
    - Offline column-mapping wizard for legacy capacity/BOM Excel files with safe Dictionary defaults (`48` weeks/yr, `82%` labour availability, Complexity `90/80/70/60/50%`, Fixture flag `80%`).
 
-## 3. Core Functional Workspaces (7 Focused Views)
+## 3. Core Functional Workspaces (7 Focused Views — organised under the 4 phases in §5)
 1. **Factory Control Hub (Executive Dashboard):**
    - Factory filter (`All Plants` / `F1` / `F2` / `F3` / `F4`), Total CapEx (`£`), Footprint (`m²` including `8 m²` fixed + `20%` variable cell uplift & `35%` factory circulation), Average Utilisation, OEE, TEEP, PCE (`VA / NVA / ENVA`), Bottleneck/Blocked Cells, and the **Micro-vs-Macro Ingestion Audit**.
 2. **5-Level BOM & Master Schedule (`L1 → L5`):**
@@ -53,7 +53,22 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Live **Logic & Data Integrity Check**: BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services (orphaned IDs, unmapped nodes, circular BOM links, missing skill/utility links).
    - **Baseline Change Governance:** version badge (`vMAJOR.MINOR`), sign-off status (`Draft` / `Reviewed` / `Approved Baseline`) for the baseline and each scenario, and a structured **Audit Log** of baseline promotions, Cell Passport re-ingestions, Master Data / legacy imports, sign-offs, restores and resets.
 
-## 5. Data Safety & Offline Single-File Build
+## 5. V1.3 Extensions: Fixed Process Governance · IDEF0 System Map · 4-Phase Navigation
+1. **Simplified 4-Phase Top Navigation** (no sidebar; phase tabs + view pills):
+   - **Phase 1 · Control & Architecture:** Factory Control Hub, Interactive IDEF0 / Swimlane System Map, Logic & Data Integrity Check, Baseline Governance / Audit Log.
+   - **Phase 2 · Inputs & Master Data:** Fixed Process Baseline, Cell Passports, 5-Level BOM & Schedule, Assets & Workforce Skills (0–3, Dictionary), Buffers & Stores.
+   - **Phase 3 · Design & Scenarios:** Cells & Macro-Routing Explorer, Facility & Cell Services, Static Scenario Planner.
+   - **Phase 4 · Validation & Outputs:** Siemens Tecnomatix Plant Simulation export/validation, Fixed Process ECR Release Pack, Cell Spec Sheets.
+   - **IDEF0 / Swimlane map:** Inputs (Fixed Process Docs, Cell Passports, BOM & Schedule, Assets/Skills, Stores), Controls (Dictionary Defaults, Drift Tolerances, Baseline Gate), 4 swimlanes (Engineering Authority, Cell & Asset Layer, Multi-Factory Network F1–F4, Decision & Siemens Plant Sim Proof) and Outputs — live status badge on every node, click-to-jump, list view for accessibility.
+2. **Immutable Fixed Process Baseline & Live Drift Reconciliation:**
+   - Locked reference layer (`state.fixedProcess`) separate from Working Cell Routes and Scenarios; `.xlsx` / `.csv` / `.json` import with Document ID, Revision (e.g. `Rev C`), Effective Date, BOM Part ID, Op No, Op Description, Standard Setup/Cycle Min, Required Skill Level (0–3), Tooling/Fixture Spec, Mandatory Step.
+   - Seeded `FPD-ATLAS/BOREAS/CIRRUS-001 Rev C` covering every mapped Make part, with deliberate ALIGNED, MATURING DRIFT (CELL-A cycle, CELL-D skipped step, F2-C01 setup), NEW LOCAL STEP (CELL-B) and COMPLIANCE DEVIATION (CELL-C missing mandatory MPI, F3-C07 Skill Level) examples.
+   - Every working op (live or scenario) classified ALIGNED / MATURING DRIFT / COMPLIANCE DEVIATION / NEW LOCAL STEP using editable drift tolerances (cycle ±5%, setup ±10%, compliance ±25%); Plant Simulation shift starts / break are editable Dictionary defaults.
+3. **Revision Diff & ECR Release Pack:**
+   - Compare / Ingest Updated Fixed Process Revision diffs Rev N → Rev N+1 against the locked baseline and the Working Factory Design (deviations falling back into alignment, newly deviating ops, impacted cells) before locking (audited `Fixed Process revision`).
+   - 1-click New Fixed Process Release / ECR Pack (`.xlsx` 5 sheets / `.csv` / print-ready sign-off pack) of approved, justified drifts with cycle/setup deltas, proposed Rev N+1 steps and working macro-blocks; can be issued & locked as the next revision.
+
+## 6. Data Safety & Offline Single-File Build
 - Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios + governance audit log in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
 - Include `README.md`, JSDoc comments on core calculation functions, and `.github/workflows/ci.yml`.
 - Bundle everything locally with zero external CDNs (`npm run build:offline` → `dist-offline/index.html`) and force-add `dist-offline/index.html` to Git.

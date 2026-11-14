@@ -9,8 +9,8 @@ import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { HubState } from './types';
 import { FACTORIES } from './types';
 
-export type IntegrityLink = 'BOM' | 'BOM ↔ Cell Routes' | 'Cell Routes ↔ Micro/Macro Ops' | 'Ops ↔ Master Data & Skills' | 'Buffers / Stores' | 'Facility Services';
-export const INTEGRITY_LINKS: IntegrityLink[] = ['BOM', 'BOM ↔ Cell Routes', 'Cell Routes ↔ Micro/Macro Ops', 'Ops ↔ Master Data & Skills', 'Buffers / Stores', 'Facility Services'];
+export type IntegrityLink = 'Fixed Process' | 'BOM' | 'BOM ↔ Cell Routes' | 'Cell Routes ↔ Micro/Macro Ops' | 'Ops ↔ Master Data & Skills' | 'Buffers / Stores' | 'Facility Services';
+export const INTEGRITY_LINKS: IntegrityLink[] = ['Fixed Process', 'BOM', 'BOM ↔ Cell Routes', 'Cell Routes ↔ Micro/Macro Ops', 'Ops ↔ Master Data & Skills', 'Buffers / Stores', 'Facility Services'];
 
 export interface IntegrityCheck {
   id: string;
@@ -66,6 +66,23 @@ export function checkIntegrity(state: HubState, model: HubModel): IntegrityRepor
   }
   const cellIds = new Set(state.passports.map((p) => p.cellId));
   const byLine = new Map(state.bom.map((b) => [b.lineId, b]));
+
+  // --- Fixed Process ↔ BOM / Working Routes (V1.3)
+  const fp = state.fixedProcess;
+  const bomParts = new Set(state.bom.map((b) => b.partId));
+  add('fp-parts', 'Fixed Process', 'Fixed Process steps for parts not in the BOM (orphaned IDs)', 'warning', [...new Set((fp?.steps ?? []).filter((s) => !bomParts.has(s.bomPartId)).map((s) => `${s.docId} ${s.bomPartId}`))]);
+  add('fp-docs', 'Fixed Process', 'Fixed Process steps whose document is not registered / locked', 'error', [...new Set((fp?.steps ?? []).filter((s) => !fp!.docs.some((d) => d.docId === s.docId)).map((s) => s.docId))]);
+  add('fp-dupes', 'Fixed Process', 'Duplicate Op No within a part', 'error', (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of fp?.steps ?? []) {
+      const k = `${s.bomPartId}|${s.opNo}`;
+      if (seen.has(k)) out.push(`${s.bomPartId} op ${s.opNo}`);
+      seen.add(k);
+    }
+    return out;
+  })());
+  add('fp-uncovered', 'Fixed Process', 'Mapped Make parts with no Fixed Process Document', 'warning', [...new Set(state.mappings.map((m) => m.bomPartId))].filter((p) => !(fp?.steps ?? []).some((s) => s.bomPartId === p)));
 
   // --- BOM
   add('bom-cycles', 'BOM', 'Circular BOM links', 'error', findBomCycles(state.bom).map((c) => c.join(' → ')));

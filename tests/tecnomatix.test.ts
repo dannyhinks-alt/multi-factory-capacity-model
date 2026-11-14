@@ -58,3 +58,16 @@ describe('Siemens Tecnomatix Plant Simulation preset', () => {
     expect(v.filter((x) => x.verdict === 'AGREE').length).toBeGreaterThan(v.filter((x) => x.verdict === 'DISAGREE').length);
   });
 });
+
+describe('Plant Simulation shift-calendar defaults (Dictionary)', () => {
+  it('uses the configured shift starts and break', () => {
+    const s = buildSeedState();
+    s.settings.plantSim = { shiftStarts: ['05:30', '13:30', '21:30'], breakMin: 45 };
+    const t = buildTecnomatixExport(computeModel(s), s).ShiftCalendar_DataTable;
+    const early = t.find((r) => r.Shift_Name === 'Early')!;
+    expect(early.Start).toBe('05:30');
+    expect(early.Break_Min).toBe(45);
+    expect(early.End).toBe('13:45'); // 7.5 h + 45 min break
+    expect(t.find((r) => r.Shift_Name === 'Late')!.Start).toBe('13:30');
+  });
+});

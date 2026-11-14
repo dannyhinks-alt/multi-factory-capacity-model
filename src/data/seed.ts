@@ -11,6 +11,8 @@ import type {
   Asset,
   BomLine,
   CellPassport,
+  FixedProcessBaseline,
+  FixedProcessStep,
   ComplexityClass,
   Competence,
   FactoryId,
@@ -663,5 +665,72 @@ export function buildSeedState(): HubState {
     auditLog: [{ id: 'aud-seed', at: now, action: 'Baseline created', actor: 'System', versionFrom: '—', versionTo: 'v1.0', status: 'Approved Baseline', details: `F1–F4 baseline: ${passports.length} Cell Passports, ${bom.length} BOM lines, ${mappings.length} mappings` }],
   };
   state.tecnomatixStats = [];
+  state.fixedProcess = buildSeedFixedProcess(passports, mappings, now);
   return state;
+}
+
+/**
+ * Seed the locked Fixed Process Baseline (Rev C) from the working routes, with deliberate examples:
+ *  - CELL-A parts: standard cycle 12% slower than working → MATURING DRIFT (process has matured).
+ *  - CELL-D parts: an extra non-mandatory "Interim visual check" not performed → MATURING DRIFT.
+ *  - F2-C01 parts: standard setup 15% lower than working → MATURING DRIFT.
+ *  - CELL-B parts: one working op absent from the document → NEW LOCAL STEP.
+ *  - CELL-C first route: mandatory "Magnetic particle crack detection (MPI)" missing → COMPLIANCE DEVIATION.
+ *  - Skill Level 2 required everywhere → F3-C07 (all Level-1 chemists) is a COMPLIANCE DEVIATION.
+ * Two CELL-A drifts carry approved justifications so the ECR Release Pack works out of the box.
+ */
+export function buildSeedFixedProcess(passports: CellPassport[], mappings: { bomPartId: string; cellId: string; routeId: string }[], now: string): FixedProcessBaseline {
+  const programmeOf = (part: string) => (part.startsWith('ATL') ? 'ATLAS' : part.startsWith('BOR') ? 'BOREAS' : 'CIRRUS');
+  const docOf = (part: string) => `FPD-${programmeOf(part)}-001`;
+  const steps: FixedProcessStep[] = [];
+  const done = new Set<string>();
+  let cMpi = false;
+  for (const m of mappings) {
+    if (done.has(m.bomPartId)) continue;
+    done.add(m.bomPartId);
+    const p = passports.find((x) => x.cellId === m.cellId);
+    const r = p?.routes.find((x) => x.routeId === m.routeId);
+    if (!p || !r) continue;
+    const base = { docId: docOf(m.bomPartId), revision: 'Rev C', effectiveDate: '2026-03-02', bomPartId: m.bomPartId };
+    const ops = p.cellId === 'CELL-B' ? r.ops.filter((_o, i) => i !== r.ops.length - 2) : r.ops;
+    for (const o of ops) {
+      const primary = o.vaType === 'VA' && !!o.assetId;
+      steps.push({
+        ...base,
+        opNo: o.opNo,
+        opDescription: o.description,
+        stdSetupMin: Math.round(o.setupMin * (p.cellId === 'F2-C01' ? 0.85 : 1) * 100) / 100,
+        stdCycleMin: Math.round(o.cycleMin * (p.cellId === 'CELL-A' && primary ? 1.12 : 1) * 100) / 100,
+        requiredSkillLevel: o.skillId ? 2 : 0,
+        toolingSpec: o.toolingId ?? '',
+        mandatory: primary || o.vaType === 'ENVA',
+      });
+    }
+    if (p.cellId === 'CELL-D') steps.push({ ...base, opNo: 75, opDescription: 'Interim visual check', stdSetupMin: 0, stdCycleMin: 1.5, requiredSkillLevel: 1, toolingSpec: '', mandatory: false });
+    if (p.cellId === 'CELL-C' && !cMpi) {
+      cMpi = true;
+      steps.push({ ...base, opNo: 95, opDescription: 'Magnetic particle crack detection (MPI)', stdSetupMin: 5, stdCycleMin: 4, requiredSkillLevel: 2, toolingSpec: '', mandatory: true });
+    }
+  }
+  const titles: Record<string, string> = {
+    'FPD-ATLAS-001': 'ATLAS Electro-Mechanical Actuator — Fixed Process Document',
+    'FPD-BOREAS-001': 'BOREAS Hydraulic Pump Skid — Fixed Process Document',
+    'FPD-CIRRUS-001': 'CIRRUS Industrial Gearbox — Fixed Process Document',
+  };
+  const docs = Object.entries(titles).map(([docId, title]) => ({ docId, revision: 'Rev C', effectiveDate: '2026-03-02', title, lockedAt: '2026-03-02T09:00:00.000Z', lockedBy: 'Engineering Authority' }));
+  const justifications: FixedProcessBaseline['justifications'] = {};
+  const cellA = passports.find((x) => x.cellId === 'CELL-A')!;
+  const aRoute = cellA.routes[0];
+  const aPart = mappings.find((m) => m.cellId === 'CELL-A' && m.routeId === aRoute.routeId)?.bomPartId;
+  if (aPart) {
+    aRoute.ops.filter((o) => o.vaType === 'VA' && o.assetId).slice(0, 2).forEach((o, i) => {
+      justifications[`CELL-A|${aRoute.routeId}|${aPart}|${o.opNo}`] = {
+        note: i === 0 ? 'Trochoidal roughing strategy proven over 3 production batches; CMM capability Cpk 1.67.' : 'High-feed finishing cutter adopted under trial T-0412; surface finish within drawing limits.',
+        status: 'Approved',
+        by: 'Process Engineering',
+        at: now,
+      };
+    });
+  }
+  return { docs, steps, history: [{ docId: 'ALL', fromRev: 'Rev B', toRev: 'Rev C', at: '2026-03-02T09:00:00.000Z', by: 'Engineering Authority', summary: 'Programme release — Rev C issued for ATLAS, BOREAS and CIRRUS' }], justifications };
 }

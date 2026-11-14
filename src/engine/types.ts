@@ -267,6 +267,10 @@ export interface Dictionary {
   recommissioningGbp: number;
   /** Buffers, WIP & Stores (V1.2). */
   stores: StoresDictionary;
+  /** Fixed Process drift tolerances (V1.3). */
+  drift: DriftTolerances;
+  /** Siemens Plant Simulation shift-calendar defaults (V1.3). */
+  plantSim: PlantSimDefaults;
 }
 
 export type StoreTier = 'RM' | 'KIT' | 'WIP' | 'FG';
@@ -320,7 +324,9 @@ export type AuditAction =
   | 'Sign-off'
   | 'Backup restore'
   | 'Reset to seed'
-  | 'Snapshot rollback';
+  | 'Snapshot rollback'
+  | 'Fixed Process revision'
+  | 'ECR pack issued';
 
 export interface AuditEntry {
   id: string;
@@ -378,4 +384,66 @@ export interface HubState {
   /** V1.2 governance & simulation statistics. */
   governance?: Governance;
   tecnomatixStats?: TxStat[];
+  /** V1.3 locked Fixed Process Baseline reference layer. */
+  fixedProcess?: FixedProcessBaseline;
+}
+
+// ---------------------------------------------------------------- V1.3 Fixed Process governance
+
+export interface DriftTolerances {
+  /** |Δ cycle| within this % of standard → ALIGNED. */
+  cycleTolerancePct: number;
+  /** |Δ setup| within this % of standard → ALIGNED. */
+  setupTolerancePct: number;
+  /** |Δ| beyond this % → COMPLIANCE DEVIATION (between the two → MATURING DRIFT). */
+  complianceTolerancePct: number;
+}
+
+export interface PlantSimDefaults {
+  /** Shift start times (HH:MM) for Early / Late / Night. */
+  shiftStarts: [string, string, string];
+  breakMin: number;
+}
+
+/** One step of a formal Fixed Process Document (locked reference, never edited in place). */
+export interface FixedProcessStep {
+  docId: string;
+  revision: string;
+  effectiveDate: string;
+  bomPartId: string;
+  opNo: number;
+  opDescription: string;
+  stdSetupMin: number;
+  stdCycleMin: number;
+  /** Required competence level (0–3) of the operator performing the step. */
+  requiredSkillLevel: number;
+  toolingSpec: string;
+  mandatory: boolean;
+}
+
+export interface FixedProcessDocMeta {
+  docId: string;
+  revision: string;
+  effectiveDate: string;
+  title: string;
+  lockedAt: string;
+  lockedBy: string;
+}
+
+export type DriftClass = 'ALIGNED' | 'MATURING DRIFT' | 'COMPLIANCE DEVIATION' | 'NEW LOCAL STEP';
+
+/** Engineering justification attached to a working-design drift (for the ECR Release Pack). */
+export interface DriftJustification {
+  note: string;
+  status: 'Proposed' | 'Approved' | 'Rejected';
+  by: string;
+  at: string;
+}
+
+export interface FixedProcessBaseline {
+  docs: FixedProcessDocMeta[];
+  steps: FixedProcessStep[];
+  history: { docId: string; fromRev: string; toRev: string; at: string; by: string; summary: string }[];
+  /** Keyed by drift key `cellId|routeId|bomPartId|opNo`. */
+  justifications: Record<string, DriftJustification>;
 }

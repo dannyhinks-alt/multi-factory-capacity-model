@@ -34,6 +34,8 @@ export const DEFAULT_DICTIONARY: Dictionary = {
     conversionGbpPerMin: 1.2,
     workingDaysPerWeek: 5,
   },
+  drift: { cycleTolerancePct: 5, setupTolerancePct: 10, complianceTolerancePct: 25 },
+  plantSim: { shiftStarts: ['06:00', '14:00', '22:00'], breakMin: 30 },
 };
 
 export const COMPLEXITY_CLASSES: ComplexityClass[] = ['A', 'B', 'C', 'D', 'E'];

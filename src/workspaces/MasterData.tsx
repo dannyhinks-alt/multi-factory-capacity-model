@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { AuditPanel } from '../components/AuditPanel';
-import { GovernancePanel, IntegrityPanel } from '../components/Governance';
 import { Badge, Button, Card, DropZone, Pills, download, fmtNum, input, td, tdNum, th } from '../components/ui';
 import { toCsv } from '../engine/csv';
 import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyColumnMapping, type ImportMode, type MergeReport } from '../engine/importer';
@@ -14,16 +13,20 @@ import { useHub } from '../store/HubContext';
 
 type Tab = 'assets' | 'fixtures' | 'skills' | 'workforce' | 'import' | 'passports' | 'legacy' | 'dictionary' | 'integrity' | 'governance';
 
-export default function MasterData({ initialTab }: { initialTab?: string }) {
-  const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'passports');
+export default function MasterData({ initialTab, mode = 'catalogues' }: { initialTab?: string; mode?: 'catalogues' | 'passports' }) {
+  const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'assets');
   const { state } = useHub();
+  if (mode === 'passports') return <PassportIngest />;
+  return <Catalogues tab={tab} setTab={setTab} state={state} />;
+}
+
+function Catalogues({ tab, setTab, state }: { tab: Tab; setTab: (t: Tab) => void; state: HubState }) {
   return (
     <>
       <Pills
         value={tab}
         onChange={setTab}
         options={[
-          { value: 'passports', label: 'Cell Passport Ingestion', count: state.passports.length },
           { value: 'assets', label: 'Master Assets', count: state.assets.length },
           { value: 'fixtures', label: 'Master Fixtures', count: state.fixtures.length },
           { value: 'skills', label: 'Skills / Roles', count: state.skills.length },
@@ -31,8 +34,6 @@ export default function MasterData({ initialTab }: { initialTab?: string }) {
           { value: 'import', label: 'Catalogue Importer' },
           { value: 'legacy', label: 'Smart Legacy Workbook Importer' },
           { value: 'dictionary', label: 'Dictionary Defaults' },
-          { value: 'integrity', label: 'Logic & Data Integrity' },
-          { value: 'governance', label: 'Baseline Governance & Audit Log' },
         ]}
       />
       {tab === 'assets' && <AssetsTable />}
@@ -40,11 +41,8 @@ export default function MasterData({ initialTab }: { initialTab?: string }) {
       {tab === 'skills' && <SkillsTable />}
       {tab === 'workforce' && <WorkforceMatrix />}
       {tab === 'import' && <MasterImporter />}
-      {tab === 'passports' && <PassportIngest />}
       {tab === 'legacy' && <LegacyImporter />}
       {tab === 'dictionary' && <DictionaryEditor />}
-      {tab === 'integrity' && <IntegrityPanel />}
-      {tab === 'governance' && <GovernancePanel />}
     </>
   );
 }
@@ -628,6 +626,12 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
       <span className="flex items-center gap-1"><input type="number" className={`${input} w-20 text-right`} value={s[key] as number} onChange={(e) => set({ [key]: +e.target.value } as Partial<Dictionary>)} />{suffix}</span>
     </label>
   );
+  const driftNum = (label: string, key: 'cycleTolerancePct' | 'setupTolerancePct' | 'complianceTolerancePct') => (
+    <label className="flex items-center justify-between gap-2 text-xs text-slate-700">
+      <span>{label}</span>
+      <span className="flex items-center gap-1"><input type="number" step="any" className={`${input} w-20 text-right`} value={s.drift[key]} onChange={(e) => set({ drift: { ...s.drift, [key]: Math.max(0, +e.target.value) } })} />%</span>
+    </label>
+  );
   const storeNum = (label: string, key: 'safetyZ' | 'oeeVariabilityCvPct' | 'conversionGbpPerMin' | 'workingDaysPerWeek', suffix = '') => (
     <label className="flex items-center justify-between gap-2 text-xs text-slate-700">
       <span>{label}</span>
@@ -661,6 +665,19 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           <div className="pt-2 text-xs font-semibold text-slate-700">Scenario relocation defaults (Workspace 7)</div>
           {num('Relocation rigging / transport (% of asset CapEx)', 'relocationRiggingPct', '%')}
           {num('Recommissioning per relocated / merged cell', 'recommissioningGbp', '£')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Fixed Process drift tolerances (V1.3)</div>
+          {driftNum('ALIGNED cycle tolerance (±)', 'cycleTolerancePct')}
+          {driftNum('ALIGNED setup tolerance (±)', 'setupTolerancePct')}
+          {driftNum('Compliance limit — beyond this is a COMPLIANCE DEVIATION (±)', 'complianceTolerancePct')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Siemens Plant Simulation shift calendar</div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
+            {(['Early', 'Late', 'Night'] as const).map((n, i) => (
+              <label key={n} className="flex items-center gap-1">{n} start
+                <input type="time" className={`${input} w-24`} value={s.plantSim.shiftStarts[i]} onChange={(e) => { const st = [...s.plantSim.shiftStarts] as [string, string, string]; st[i] = e.target.value; set({ plantSim: { ...s.plantSim, shiftStarts: st } }); }} />
+              </label>
+            ))}
+            <label className="flex items-center gap-1">Break <input type="number" className={`${input} w-16 text-right`} value={s.plantSim.breakMin} onChange={(e) => set({ plantSim: { ...s.plantSim, breakMin: Math.max(0, +e.target.value) } })} /> min</label>
+          </div>
           <div className="pt-2 text-xs font-semibold text-slate-700">Buffers, WIP & Stores</div>
           {storeNum('WIP safety z-score (1.65 ≈ 95%)', 'safetyZ')}
           {storeNum('OEE variability (CV %)', 'oeeVariabilityCvPct', '%')}

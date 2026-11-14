@@ -10,6 +10,7 @@ import { sampleDesResults } from '../src/engine/des';
 import { TARGET_FIELDS } from '../src/engine/importer';
 import { computeModel } from '../src/engine/model';
 import { sampleTxStats } from '../src/engine/tecnomatix';
+import { baselineRows, buildEcrPack, ecrToSteps, reconcile } from '../src/engine/fixedprocess';
 import { writeWorkbook } from '../src/engine/sheet';
 
 const out = join(process.cwd(), 'samples');
@@ -65,4 +66,8 @@ writeFileSync(
   join(out, 'plantsim-statistics.csv'),
   toCsv(sampleTxStats(computeModel(state), state).map((t) => ({ Object: t.objectPath, StatWorkingTime: (t.workingPct / 100).toFixed(4), StatBlockingTime: (t.blockingPct / 100).toFixed(4), StatWaitingTime: (t.waitingPct / 100).toFixed(4), StatThroughput: t.throughput ?? '' }))),
 );
+// Fixed Process Baseline (Rev C) and an updated revision (Rev D) built from the approved drifts.
+writeFileSync(join(out, 'fixed-process-rev-C.xlsx'), Buffer.from(writeWorkbook([{ name: 'Fixed_Process', rows: baselineRows(state.fixedProcess!.steps) }])));
+const pack = buildEcrPack(state, reconcile(state), computeModel(state), 'Sample', 'v1.0', '2026-11-01T09:00:00.000Z');
+writeFileSync(join(out, 'fixed-process-ATLAS-rev-D.csv'), toCsv(baselineRows(ecrToSteps(pack, '2026-12-01'))));
 console.log(`Samples written to ${out}`);

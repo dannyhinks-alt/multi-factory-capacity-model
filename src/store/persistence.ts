@@ -82,6 +82,8 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
       ...DEFAULT_DICTIONARY,
       ...(r.settings ?? {}),
       complexityPct: { ...DEFAULT_DICTIONARY.complexityPct, ...(r.settings?.complexityPct ?? {}) },
+      drift: { ...DEFAULT_DICTIONARY.drift, ...(r.settings?.drift ?? {}) },
+      plantSim: { ...DEFAULT_DICTIONARY.plantSim, ...(r.settings?.plantSim ?? {}) },
       stores: {
         ...DEFAULT_DICTIONARY.stores,
         ...(r.settings?.stores ?? {}),
@@ -90,6 +92,8 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     },
     governance: r.governance ?? defaultGovernance(),
     tecnomatixStats: r.tecnomatixStats ?? [],
+    // Pre-V1.3 data: adopt the seeded Fixed Process Baseline (locked reference layer).
+    fixedProcess: r.fixedProcess ?? fallback.fixedProcess,
     // Pre-V1.2 data: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
     bom: r.governance ? r.bom : r.bom.map((b) => (b.unitCostGbp === undefined && b.level === 5 ? { ...b, unitCostGbp: fallback.bom.find((x) => x.partId === b.partId)?.unitCostGbp } : b)),
     desResults: r.desResults ?? [],
