@@ -114,6 +114,8 @@ export interface PassportRoute {
   description: string;
   batchSize: number;
   ops: MicroOp[];
+  /** Scenario-only Effective OEE % override applied when folding (set from a Macro-Block override). */
+  oeeOverridePct?: number;
 }
 
 export interface ShiftPattern {
@@ -205,6 +207,8 @@ export interface MacroOverride {
   setupMin?: number;
   cycleMin?: number;
   batchSize?: number;
+  /** Effective OEE % override for this route's Macro-Block (V1.4). */
+  oeePct?: number;
 }
 
 /** One-off CapEx (£) or recurring cost (£/yr) adjustment recorded by a scenario operation. */
@@ -271,6 +275,8 @@ export interface Dictionary {
   drift: DriftTolerances;
   /** Siemens Plant Simulation shift-calendar defaults (V1.3). */
   plantSim: PlantSimDefaults;
+  /** Governance gate (V1.4): only Reviewed / Approved scenarios may be promoted to Live Baseline. */
+  requireApprovalForPromotion: boolean;
 }
 
 export type StoreTier = 'RM' | 'KIT' | 'WIP' | 'FG';

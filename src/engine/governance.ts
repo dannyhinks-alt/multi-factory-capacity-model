@@ -83,3 +83,13 @@ export function carryGovernance(previous: HubState, next: HubState): HubState {
 export function auditCsv(log: AuditEntry[]): string {
   return toCsv(log, ['at', 'action', 'actor', 'versionFrom', 'versionTo', 'status', 'details']);
 }
+
+/**
+ * Promotion gate (V1.4): when the Dictionary flag “Require Reviewed/Approved status before promoting”
+ * is on, only scenarios signed off as Reviewed or Approved Baseline may be promoted to Live Baseline.
+ */
+export function canPromote(scenarioStatus: SignOffStatus | undefined, settings: HubState['settings']): { ok: boolean; reason: string } {
+  const st = scenarioStatus ?? 'Draft';
+  if (!settings.requireApprovalForPromotion) return { ok: true, reason: st === 'Approved Baseline' ? 'Approved' : `${st} — promotion allowed (gate off)` };
+  return st === 'Draft' ? { ok: false, reason: 'Governance gate: scenario must be Reviewed or Approved before promotion' } : { ok: true, reason: `${st} — passes governance gate` };
+}

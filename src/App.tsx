@@ -15,79 +15,15 @@ import { buildSeedState } from './data/seed';
 import { GovernancePanel, IntegrityPanel, VersionBadge } from './components/Governance';
 import { StoresPanel } from './components/StoresPanel';
 import { SystemMap } from './components/SystemMap';
+import { SmartImportModal } from './components/SmartImport';
 import type { ViewId } from './engine/systemmap';
+import { ALL_VIEWS, EXECUTIVE_VIEWS, phasesFor, resolveNav, type NavTarget, type ViewMode } from './engine/navigation';
 
 /** Legacy workspace IDs are still accepted by `navigate` and map onto the phase views. */
 export type WorkspaceId = ViewId;
 
-interface ViewDef {
-  id: ViewId;
-  label: string;
-  hint: string;
-}
-interface PhaseDef {
-  n: number;
-  label: string;
-  views: ViewDef[];
-}
-
-/** Simplified 4-phase lifecycle navigation (V1.3). */
-export const PHASES: PhaseDef[] = [
-  {
-    n: 1,
-    label: 'Control & Architecture',
-    views: [
-      { id: 'hub', label: 'Factory Control Hub', hint: 'Executive KPIs' },
-      { id: 'systemmap', label: 'IDEF0 / Swimlane Map', hint: 'Process & data flow' },
-      { id: 'integrity', label: 'Logic & Data Integrity', hint: 'End-to-end links' },
-      { id: 'governance', label: 'Baseline Governance', hint: 'Sign-off & audit log' },
-    ],
-  },
-  {
-    n: 2,
-    label: 'Inputs & Master Data',
-    views: [
-      { id: 'fixed', label: 'Fixed Process Baseline', hint: 'Locked reference & drift' },
-      { id: 'passports', label: 'Cell Passports', hint: 'Batch ingestion' },
-      { id: 'bom', label: '5-Level BOM & Schedule', hint: 'L1 → L5, route linker' },
-      { id: 'master', label: 'Assets & Workforce Skills', hint: 'Catalogues, 0–3 matrix, Dictionary' },
-      { id: 'stores', label: 'Buffers & Stores', hint: 'RM · kitting · WIP · despatch' },
-    ],
-  },
-  {
-    n: 3,
-    label: 'Design & Scenarios',
-    views: [
-      { id: 'cells', label: 'Cells & Macro-Routing', hint: 'F1–F4 explorer, What-If' },
-      { id: 'services', label: 'Facility & Cell Services', hint: 'Utilities & shared plant' },
-      { id: 'scenarios', label: 'Static Scenario Planner', hint: 'What-if & cause-effect' },
-    ],
-  },
-  {
-    n: 4,
-    label: 'Validation & Outputs',
-    views: [
-      { id: 'des', label: 'Siemens Plant Simulation', hint: 'Tecnomatix export & validation' },
-      { id: 'ecr', label: 'Fixed Process ECR Pack', hint: 'Release next revision' },
-      { id: 'specs', label: 'Spec Sheets', hint: 'Cell facilities & CapEx' },
-    ],
-  },
-];
-
-const ALL_VIEWS = PHASES.flatMap((p) => p.views.map((v) => ({ ...v, phase: p.n })));
-
-export interface NavTarget {
-  ws: ViewId;
-  cellId?: string;
-  /** Sub-tab to open (e.g. Master Data → 'dictionary', or legacy 'integrity' / 'governance' / 'passports'). */
-  tab?: string;
-}
-
-/** Translate legacy targets (e.g. master + tab 'governance') onto the phase views. */
-export function resolveNav(t: NavTarget): { view: ViewId; tab?: string } {
-  if (t.ws === 'master' && (t.tab === 'integrity' || t.tab === 'governance' || t.tab === 'passports')) return { view: t.tab };
-  return { view: ALL_VIEWS.some((v) => v.id === t.ws) ? t.ws : 'hub', tab: t.tab };
-}
+export type { NavTarget, ViewMode } from './engine/navigation';
+export { PHASES, EXECUTIVE_VIEWS, phasesFor, resolveNav } from './engine/navigation';
 
 export default function App() {
   const { ready, backend, savedAt, snapshots, state, replaceState, snapshotNow, resetToBaseline } = useHub();
@@ -102,6 +38,15 @@ export default function App() {
   const [focusCell, setFocusCell] = useState<string | undefined>();
   const [focusTab, setFocusTab] = useState<string | undefined>();
   const [showSnaps, setShowSnaps] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [mode, setMode] = useState<ViewMode>(() => {
+    try {
+      return localStorage.getItem('mfh:mode') === 'executive' ? 'executive' : 'engineering';
+    } catch {
+      return 'engineering';
+    }
+  });
+  const phases = phasesFor(mode);
   const restoreRef = useRef<HTMLInputElement>(null);
   const phase = ALL_VIEWS.find((v) => v.id === view)?.phase ?? 1;
   const current = ALL_VIEWS.find((v) => v.id === view);
@@ -114,8 +59,20 @@ export default function App() {
     }
   }, [view]);
 
+  const changeMode = (m: ViewMode) => {
+    setMode(m);
+    try {
+      localStorage.setItem('mfh:mode', m);
+    } catch {
+      /* ignore */
+    }
+    if (m === 'executive' && !EXECUTIVE_VIEWS.includes(view)) setView('hub');
+  };
+
   const navigate = (t: NavTarget) => {
     const r = resolveNav(t);
+    // Jumping to an engineering-only view (e.g. from a Next Action) switches to Full Engineering.
+    if (mode === 'executive' && !EXECUTIVE_VIEWS.includes(r.view)) changeMode('engineering');
     setView(r.view);
     setFocusCell(t.cellId);
     setFocusTab(r.tab);
@@ -140,7 +97,7 @@ export default function App() {
             <div className="text-sm font-semibold">Master Control Hub</div>
           </div>
           <nav className="flex flex-wrap gap-1" aria-label="Lifecycle phases">
-            {PHASES.map((p) => (
+            {phases.map((p) => (
               <button
                 key={p.n}
                 onClick={() => navigate({ ws: p.views[0].id })}
@@ -152,6 +109,14 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex flex-wrap items-center gap-2 text-slate-900">
+            <div className="inline-flex overflow-hidden rounded-md border border-slate-600 text-xs" role="group" aria-label="View mode">
+              {(['executive', 'engineering'] as const).map((m) => (
+                <button key={m} onClick={() => changeMode(m)} className={`px-2.5 py-1.5 font-medium ${mode === m ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`} title={m === 'executive' ? 'Control Hub, IDEF0 map, Scenario Planner and Validation / ECR outputs' : 'All 15 views'}>
+                  {m === 'executive' ? 'Executive View' : 'Full Engineering'}
+                </button>
+              ))}
+            </div>
+            <Button variant="primary" onClick={() => setShowImport(true)} title="Drop any file — the hub detects its type and opens the matching import">⬆ Smart Import</Button>
             <VersionBadge onClick={() => navigate({ ws: 'governance' })} />
             <Button onClick={() => download(`multi-factory-hub-backup-${new Date().toISOString().slice(0, 10)}.json`, backupJson(state), 'application/json')} title="1-click full-plant JSON backup">
               ⬇ Backup
@@ -187,7 +152,7 @@ export default function App() {
           </div>
         </div>
         <nav aria-label="Phase views" className="flex flex-wrap items-center gap-1 px-4 py-1.5">
-          {PHASES[phase - 1].views.map((v) => (
+          {(phases.find((p) => p.n === phase) ?? phases[0]).views.map((v) => (
             <button
               key={v.id}
               onClick={() => navigate({ ws: v.id })}
@@ -198,10 +163,11 @@ export default function App() {
             </button>
           ))}
           <span className="ml-auto hidden text-[11px] text-slate-500 md:inline">
-            Phase {phase} · {current?.hint} · {backend === 'indexeddb' ? 'IndexedDB' : backend === 'localstorage' ? 'localStorage' : backend} · {savedAt ? `saved ${new Date(savedAt).toLocaleTimeString('en-GB')}` : ready ? 'not yet saved' : 'loading…'}
+            {mode === 'executive' ? 'Executive View' : 'Full Engineering'} · Phase {phase} · {current?.hint} · {backend === 'indexeddb' ? 'IndexedDB' : backend === 'localstorage' ? 'localStorage' : backend} · {savedAt ? `saved ${new Date(savedAt).toLocaleTimeString('en-GB')}` : ready ? 'not yet saved' : 'loading…'}
           </span>
         </nav>
       </header>
+      {showImport && <SmartImportModal onClose={() => setShowImport(false)} onNavigate={(v, tab) => navigate({ ws: v, tab })} />}
       <main className="space-y-4 p-4">
         {view === 'hub' && <ControlHub navigate={navigate} />}
         {view === 'systemmap' && <SystemMap onNavigate={(v, tab) => navigate({ ws: v, tab })} />}

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
 import { AuditPanel } from '../components/AuditPanel';
 import { IntegrityPanel } from '../components/Governance';
+import { NextActionsStrip } from '../components/NextActions';
 import { STORE_TIERS } from '../engine/stores';
 import { Badge, Button, Card, ConstraintTag, FactoryFilter, Meter, Stat, fmtGbp, fmtNum, fmtPct, statusTone, td, tdNum, th } from '../components/ui';
 import { UtilChart } from '../components/UtilChart';
@@ -23,6 +24,7 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
 
   return (
     <>
+      <NextActionsStrip navigate={navigate} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <FactoryFilter value={scope} onChange={setScope} />
         <div className="text-xs text-slate-500">{scope === 'All' ? `${k.cells} cells across F1–F4` : FACTORY_NAMES[scope]} · {fmtNum(k.annualOutput)} top Assemblies / yr scheduled</div>

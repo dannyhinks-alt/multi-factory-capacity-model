@@ -30,6 +30,8 @@ import {
   splitOp,
   editOp,
   applyPreset,
+  factorySpaceRows,
+  setShiftPattern,
   type Effect,
   type PresetId,
   type Scenario,
@@ -42,6 +44,7 @@ import type { FactoryId } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES, QUARTERS } from '../engine/types';
 import { useHub } from '../store/HubContext';
 import { statusBadgeTone } from '../components/Governance';
+import { canPromote } from '../engine/governance';
 
 type Tab = 'compare' | 'topology' | 'assets' | 'routes' | 'presets';
 
@@ -115,15 +118,23 @@ export default function ScenarioPlanner({ navigate }: { navigate: (t: NavTarget)
               <Button variant="danger" onClick={() => confirm(`Delete scenario “${active.name}”?`) && deleteScenario(active.id)}>Delete</Button>
               <Button
                 variant="primary"
+                disabled={!canPromote(active.status, state.settings).ok}
+                title={canPromote(active.status, state.settings).reason}
                 onClick={async () => {
                   const warn = active.status === 'Approved Baseline' ? '' : `\n\n⚠ This scenario is ${active.status ?? 'Draft'} (not Approved) — the new baseline will be Draft.`;
                   if (!confirm(`Promote “${active.name}” to Live Baseline?\n\nThe current live state is snapshotted to IndexedDB first (restore from ⟲ Snapshots) and the promotion is recorded in the governance audit log.${warn}`)) return;
-                  await promoteScenario(active.id);
+                  try {
+                    await promoteScenario(active.id);
+                  } catch (e) {
+                    alert((e as Error).message);
+                    return;
+                  }
                   alert(`“${active.name}” is now the Live Baseline. A snapshot of the previous live state was saved.`);
                 }}
               >
                 ⬆ Promote Scenario to Live Baseline
               </Button>
+              {!canPromote(active.status, state.settings).ok && <span className="text-[11px] text-amber-800">🔒 Governance gate on — mark Reviewed or Approved to promote</span>}
             </div>
           </div>
         )}
@@ -376,33 +387,33 @@ function TopologyPanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation;
           </div>
         )}
       </Card>
-      <Card title={`Factory footprint & utility ceilings — ${sc.name} vs Baseline`} subtitle="Footprint = Σ (asset m² × 1.20 + 8 m²) × 1.35 circulation, against each plant's floor-area and utility ceilings.">
+      <Card title={`Factory footprint & utility ceilings — ${sc.name} vs Baseline`} subtitle="Same basis as Workspace 1 and Buffers & Stores: cells (Σ asset m² × 1.20 + 8 m²) × 1.35 circulation, plus stores & buffers, against each factory's floorAreaM2 ceiling; utilities against plant ceilings.">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 <th className={th}>Factory</th>
                 <th className={`${th} text-right`}>Cells</th>
-                <th className={th}>Footprint vs floor ceiling</th>
+                <th className={`${th} text-right`}>Cells + circulation m²</th>
+                <th className={`${th} text-right`}>Stores & buffers m²</th>
+                <th className={th}>Total m² vs floor ceiling</th>
                 {SERVICE_KEYS.map((k) => <th key={k} className={th}>{SERVICE_LABELS[k]}</th>)}
               </tr>
             </thead>
             <tbody>
-              {FACTORIES.map((f) => {
+              {factorySpaceRows(base, ev).map((row) => {
+                const f = row.factory;
                 const sb = ev.model.services.find((x) => x.factory === f)!;
                 const bb = base.model.services.find((x) => x.factory === f)!;
-                const cellsS = ev.model.cells.filter((c) => c.factory === f);
-                const cellsB = base.model.cells.filter((c) => c.factory === f);
-                const fpS = cellsS.reduce((t, c) => t + c.totalFootprintM2, 0) * (1 + sc.state.settings.circulationPct / 100);
-                const fpB = cellsB.reduce((t, c) => t + c.totalFootprintM2, 0) * (1 + sc.state.settings.circulationPct / 100);
-                const ceiling = sc.state.utilities.find((u) => u.factory === f)?.floorAreaM2 ?? 0;
                 return (
                   <tr key={f}>
                     <td className={`${td} font-semibold`}>{f}</td>
-                    <td className={tdNum}>{cellsB.length} → <b>{cellsS.length}</b></td>
+                    <td className={tdNum}>{row.cellsBase} → <b>{row.cellsScenario}</b></td>
+                    <td className={tdNum}>{fmtNum(row.cellCirculationBaseM2)} → <b>{fmtNum(row.cellCirculationScenarioM2)}</b></td>
+                    <td className={tdNum}>{fmtNum(row.storesBaseM2)} → <b>{fmtNum(row.storesScenarioM2)}</b></td>
                     <td className={td}>
-                      <div className="text-[11px] tabular-nums">{fmtNum(fpB)} → <b>{fmtNum(fpS)}</b> / {fmtNum(ceiling)} m²</div>
-                      <Meter pct={ceiling ? (fpS / ceiling) * 100 : 0} near={sc.state.settings.utilityAmberPct} limit={100} width="w-24" />
+                      <div className="text-[11px] tabular-nums">{fmtNum(row.totalBaseM2)} → <b>{fmtNum(row.totalScenarioM2)}</b> / {fmtNum(row.ceilingM2)} m² {row.overCeiling && <Badge tone="critical">over</Badge>}</div>
+                      <Meter pct={row.scenarioPctOfCeiling} near={sc.state.settings.utilityAmberPct} limit={100} width="w-24" />
                     </td>
                     {SERVICE_KEYS.map((k) => {
                       const r = sb.rows.find((x) => x.key === k)!;
@@ -597,7 +608,8 @@ function RoutePanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation; ba
   const [ovSetup, setOvSetup] = useState('');
   const [ovCycle, setOvCycle] = useState('');
   const [ovBatch, setOvBatch] = useState('');
-  useEffect(() => { setOvSetup(ov?.setupMin?.toString() ?? ''); setOvCycle(ov?.cycleMin?.toString() ?? ''); setOvBatch(ov?.batchSize?.toString() ?? ''); }, [ov, cellId, routeId]);
+  const [ovOee, setOvOee] = useState('');
+  useEffect(() => { setOvSetup(ov?.setupMin?.toString() ?? ''); setOvCycle(ov?.cycleMin?.toString() ?? ''); setOvBatch(ov?.batchSize?.toString() ?? ''); setOvOee(ov?.oeePct?.toString() ?? ''); }, [ov, cellId, routeId]);
   const edit = (fn: Parameters<typeof editScenarioById>[1]) => editScenarioById(sc.id, fn);
   const parts = sc.state.mappings.filter((m) => m.cellId === cellId && m.routeId === routeId).map((m) => m.bomPartId);
   const allRoutes = sc.state.passports.flatMap((x) => x.routes.map((rt) => ({ cellId: x.cellId, factory: x.factory, routeId: rt.routeId })));
@@ -695,11 +707,22 @@ function RoutePanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation; ba
                 <label className="flex items-center justify-between gap-2">Rolled-up setup min <input className={`${input} w-20 text-right`} placeholder={mS ? mS.rolledSetupMin.toFixed(1) : ''} value={ovSetup} onChange={(e) => setOvSetup(e.target.value)} /></label>
                 <label className="flex items-center justify-between gap-2">Bottleneck cycle min <input className={`${input} w-20 text-right`} placeholder={mS ? mS.bottleneckCycleMin.toFixed(2) : ''} value={ovCycle} onChange={(e) => setOvCycle(e.target.value)} /></label>
                 <label className="flex items-center justify-between gap-2">Batch size <input className={`${input} w-20 text-right`} placeholder={String(r.batchSize)} value={ovBatch} onChange={(e) => setOvBatch(e.target.value)} /></label>
+                <label className="flex items-center justify-between gap-2">Effective OEE % (optional) <input type="number" min={5} max={100} className={`${input} w-20 text-right`} placeholder={mS ? mS.effectiveOeePct.toFixed(1) : ''} value={ovOee} onChange={(e) => setOvOee(e.target.value)} /></label>
                 <div className="flex gap-2">
-                  <Button variant="primary" onClick={() => edit((d) => setMacroOverride(d, cellId, routeId, { setupMin: ovSetup ? +ovSetup : undefined, cycleMin: ovCycle ? +ovCycle : undefined, batchSize: ovBatch ? +ovBatch : undefined }))}>Apply override</Button>
+                  <Button variant="primary" onClick={() => edit((d) => setMacroOverride(d, cellId, routeId, { setupMin: ovSetup ? +ovSetup : undefined, cycleMin: ovCycle ? +ovCycle : undefined, batchSize: ovBatch ? +ovBatch : undefined, oeePct: ovOee ? Math.min(100, Math.max(5, +ovOee)) : undefined }))}>Apply override</Button>
                   {ov && <Button onClick={() => edit((d) => setMacroOverride(d, cellId, routeId, null))}>Clear</Button>}
                 </div>
                 {ov && <Badge tone="info">Macro override active</Badge>}
+                <div className="border-t border-slate-100 pt-2">
+                  <div className="mb-1 flex items-center justify-between"><span>Cell shift pattern</span><span className="text-[10px] text-slate-500">{p.shiftPattern.hoursPerShift} h · {p.shiftPattern.daysPerWeek} d/wk</span></div>
+                  <Pills
+                    label="Shifts per day"
+                    value={String(p.shiftPattern.shiftsPerDay) as '1' | '2' | '3'}
+                    onChange={(v) => edit((d) => setShiftPattern(d, cellId, +v, true))}
+                    options={(['1', '2', '3'] as const).map((n) => ({ value: n, label: `${n} shift${n === '1' ? '' : 's'}` }))}
+                  />
+                  <div className="mt-1 text-[10px] text-slate-500">Adds / releases a matching shift crew so the Competent Labour ≥ 2 cap scales.</div>
+                </div>
               </div>
             </Card>
           </div>

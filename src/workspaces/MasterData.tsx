@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AuditPanel } from '../components/AuditPanel';
 import { Badge, Button, Card, DropZone, Pills, download, fmtNum, input, td, tdNum, th } from '../components/ui';
 import { toCsv } from '../engine/csv';
 import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyColumnMapping, type ImportMode, type MergeReport } from '../engine/importer';
-import { ingestPassports, type IngestReport } from '../engine/ingest';
+import { ingestPassports, normalisePassport, type IngestReport } from '../engine/ingest';
+import { MASTER_TARGET } from '../engine/smartimport';
 import { LEGACY_FIELDS, applyLegacy, convertLegacy, mapLegacyColumns, type LegacyConversion } from '../engine/legacy';
 import { COMPLEXITY_CLASSES } from '../engine/settings';
 import { readWorkbook, writeWorkbook, type SheetData } from '../engine/sheet';
@@ -303,6 +304,15 @@ function WorkforceMatrix() {
 function MasterImporter() {
   const { state, update } = useHub();
   const [target, setTarget] = useState<ImportTarget>('assets');
+  const { takePendingImport, pendingImport } = useHub();
+  useEffect(() => {
+    const p = takePendingImport(['master-assets', 'master-fixtures', 'master-skills']);
+    if (!p) return;
+    const t = MASTER_TARGET[p.kind]!;
+    setTarget(t);
+    void load([p.file], t, p.sheet);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport]);
   const [mode, setMode] = useState<ImportMode>('merge');
   const [sheets, setSheets] = useState<SheetData[] | null>(null);
   const [fileName, setFileName] = useState('');
@@ -313,16 +323,17 @@ function MasterImporter() {
   const sheet = sheets?.[sheetIdx];
   const profiles = state.mappingProfiles.filter((p) => p.target === target);
 
-  const load = async (files: File[]) => {
+  const load = async (files: File[], t: ImportTarget = target, sheetName?: string) => {
     setError('');
     setReport(null);
     try {
       const f = files[0];
       const s = readWorkbook(await f.arrayBuffer(), f.name);
+      const idx = Math.max(0, sheetName ? s.findIndex((x) => x.name === sheetName) : 0);
       setSheets(s);
       setFileName(f.name);
-      setSheetIdx(0);
-      setMapping(fuzzyMapColumns(s[0]?.headers ?? [], target, profiles[0]));
+      setSheetIdx(idx);
+      setMapping(fuzzyMapColumns(s[idx]?.headers ?? [], t, state.mappingProfiles.find((x) => x.target === t)));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -433,9 +444,30 @@ function MasterImporter() {
 
 // ---------------------------------------------------------------- Batch passport ingestion
 function PassportIngest() {
-  const { state, update } = useHub();
+  const { state, update, takePendingImport, pendingImport } = useHub();
   const [report, setReport] = useState<IngestReport | null>(null);
   const [busy, setBusy] = useState(false);
+  // Smart Import hand-off: preview the detected passport file before ingesting.
+  const [preview, setPreview] = useState<{ name: string; data: unknown } | null>(null);
+  useEffect(() => {
+    const p = takePendingImport(['passports']);
+    if (p) void p.file.text().then((t) => setPreview({ name: p.file.name, data: JSON.parse(t) }));
+  }, [pendingImport]);
+  const previewRows = useMemo(() => {
+    if (!preview) return [];
+    const d = preview.data as { passports?: unknown[] };
+    const list = Array.isArray(preview.data) ? preview.data : Array.isArray(d?.passports) ? d.passports : [preview.data];
+    return list.map((item) => {
+      try {
+        const { passport } = normalisePassport(item, preview.name);
+        const held = state.passports.find((x) => x.cellId === passport.cellId);
+        const action = !held ? 'Add' : held.revision > passport.revision ? 'Skip (older revision)' : 'Update';
+        return { cellId: passport.cellId, factory: passport.factory, revision: passport.revision, held: held?.revision, routes: passport.routes.length, ops: passport.routes.reduce((t, r) => t + r.ops.length, 0), action };
+      } catch (e) {
+        return { cellId: '—', factory: '', revision: 0, held: undefined, routes: 0, ops: 0, action: `Error: ${(e as Error).message}` };
+      }
+    });
+  }, [preview, state.passports]);
   const ingest = async (files: File[]) => {
     setBusy(true);
     const raws: { name: string; data: unknown }[] = [];
@@ -466,6 +498,23 @@ function PassportIngest() {
             <Button onClick={() => download('all-cell-passports.json', JSON.stringify({ passports: state.passports }, null, 2), 'application/json')}>⬇ All {state.passports.length} passports (bundle)</Button>
             <Button onClick={() => run(demoReingest(state), [], 'Re-ingestion demo')}>▶ Simulate re-ingestion of 3 updated passports</Button>
           </div>
+          {preview && (
+            <div className="mt-3 rounded border border-blue-200 bg-blue-50/50 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span><b>Smart Import preview</b> · <span className="font-mono">{preview.name}</span> · {previewRows.length} passport(s)</span>
+                <span className="flex gap-2">
+                  <Button variant="primary" onClick={() => { run([preview], [], `Ingest ${preview.name} (Smart Import)`); setPreview(null); }}>Ingest {previewRows.filter((r) => r.action === 'Add' || r.action === 'Update').length} passport(s)</Button>
+                  <Button onClick={() => setPreview(null)}>Discard</Button>
+                </span>
+              </div>
+              <div className="max-h-56 overflow-auto scroll-thin">
+                <table className="w-full">
+                  <thead><tr><th className={th}>Cell</th><th className={th}>Factory</th><th className={`${th} text-right`}>Rev (file / held)</th><th className={`${th} text-right`}>Routes</th><th className={`${th} text-right`}>Micro-ops</th><th className={th}>Action</th></tr></thead>
+                  <tbody>{previewRows.map((r, i) => <tr key={i}><td className={`${td} font-mono text-[11px]`}>{r.cellId}</td><td className={td}>{r.factory}</td><td className={tdNum}>{r.revision} / {r.held ?? '—'}</td><td className={tdNum}>{r.routes}</td><td className={tdNum}>{r.ops}</td><td className={td}><Badge tone={r.action === 'Add' ? 'good' : r.action === 'Update' ? 'info' : r.action.startsWith('Error') ? 'critical' : 'neutral'}>{r.action}</Badge></td></tr>)}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {report && <IngestReportView report={report} />}
         </Card>
         <Card title="Recent ingestion log">
@@ -528,7 +577,12 @@ function demoReingest(state: HubState): { name: string; data: unknown }[] {
 
 // ---------------------------------------------------------------- Smart Legacy Workbook Importer
 function LegacyImporter() {
-  const { state, update } = useHub();
+  const { state, update, takePendingImport, pendingImport } = useHub();
+  useEffect(() => {
+    const p = takePendingImport(['legacy']);
+    if (p) void load([p.file]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport]);
   const [sheets, setSheets] = useState<SheetData[] | null>(null);
   const [sheetIdx, setSheetIdx] = useState(0);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -662,6 +716,11 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           {num('DES buffer queue limit', 'desBufferLimit', 'units')}
           {num('Contribution margin per top Assembly (scenario payback)', 'contributionMarginGbp', '£')}
           {num('Depreciation period (unit conversion cost)', 'depreciationYears', 'yrs')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Governance</div>
+          <label className="flex items-start gap-2 text-xs text-slate-700">
+            <input type="checkbox" className="mt-0.5" checked={!!s.requireApprovalForPromotion} onChange={(e) => set({ requireApprovalForPromotion: e.target.checked })} />
+            <span>Require Reviewed/Approved status before promoting Scenario to Live Baseline<span className="block text-[10px] text-slate-500">When on, Draft scenarios cannot be promoted (Workspace 7 button is locked and the hub refuses the promotion).</span></span>
+          </label>
           <div className="pt-2 text-xs font-semibold text-slate-700">Scenario relocation defaults (Workspace 7)</div>
           {num('Relocation rigging / transport (% of asset CapEx)', 'relocationRiggingPct', '%')}
           {num('Recommissioning per relocated / merged cell', 'recommissioningGbp', '£')}
