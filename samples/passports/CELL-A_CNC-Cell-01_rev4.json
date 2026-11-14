@@ -1,0 +1,543 @@
+{
+  "passportId": "PP-CELL-A",
+  "schemaVersion": "1.0",
+  "cellId": "CELL-A",
+  "cellName": "CNC Cell 01",
+  "factory": "F1",
+  "revision": 4,
+  "issuedAt": "2026-11-10T08:00:00.000Z",
+  "gateStatus": "PASSED",
+  "shiftPattern": {
+    "shiftsPerDay": 2,
+    "hoursPerShift": 7.5,
+    "daysPerWeek": 5
+  },
+  "assets": [
+    {
+      "assetId": "CELL-A-VMC5-01",
+      "qty": 2
+    },
+    {
+      "assetId": "CELL-A-CMM-02",
+      "qty": 1
+    },
+    {
+      "assetId": "CELL-A-DEBURR-03",
+      "qty": 1
+    },
+    {
+      "assetId": "CELL-A-WASH-04",
+      "qty": 1
+    }
+  ],
+  "fixtures": [
+    {
+      "toolingId": "FX-ATL-100-DM-W-01",
+      "qty": 2
+    },
+    {
+      "toolingId": "FX-BOR-100-PM-C-02",
+      "qty": 2
+    },
+    {
+      "toolingId": "FX-CIR-OS-C-02",
+      "qty": 2
+    }
+  ],
+  "crew": [
+    {
+      "operatorId": "CELL-A-OP01",
+      "name": "Operator A1",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 2
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP02",
+      "name": "Trainee A2",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 1
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP03",
+      "name": "Operator A3",
+      "roleId": "R-MCH",
+      "competence": {
+        "SK-CNC": 3,
+        "SK-CMM": 1
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP04",
+      "name": "Operator A4",
+      "roleId": "R-MCH",
+      "competence": {
+        "SK-CNC": 2
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP05",
+      "name": "Operator A5",
+      "roleId": "R-MCH",
+      "competence": {
+        "SK-CNC": 2,
+        "SK-CMM": 0
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP06",
+      "name": "Trainee A6",
+      "roleId": "R-MCH",
+      "competence": {
+        "SK-CNC": 1,
+        "SK-GEN": 0
+      }
+    },
+    {
+      "operatorId": "CELL-A-OP07",
+      "name": "Operator A7",
+      "roleId": "R-INS",
+      "competence": {
+        "SK-CMM": 2,
+        "SK-GEN": 1
+      }
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "RT-ATL-100-DM-W-01",
+      "variantId": "ATL-100-DM-W-01",
+      "productFamily": "ATLAS",
+      "description": "Output Shaft",
+      "batchSize": 20,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Kit & stage material",
+          "setupMin": 0,
+          "cycleMin": 0.9,
+          "labourMin": 1,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Load & clamp in fixture",
+          "setupMin": 0,
+          "cycleMin": 1.5,
+          "labourMin": 1.6,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "OP10 Rough machine datum faces",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 57,
+          "cycleMin": 1.4,
+          "labourMin": 0.4,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-ATL-100-DM-W-01",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "OP20 Semi-finish profile",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 57,
+          "cycleMin": 1.1,
+          "labourMin": 0.3,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-ATL-100-DM-W-01",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "OP30 Finish machine bores",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 57,
+          "cycleMin": 2.1,
+          "labourMin": 0.6,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-ATL-100-DM-W-01",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 60,
+          "description": "OP40 Drill & tap",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 57,
+          "cycleMin": 2.9,
+          "labourMin": 1,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-ATL-100-DM-W-01",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 70,
+          "description": "Tool change & offset check",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 57,
+          "cycleMin": 2.7,
+          "labourMin": 0.6,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-ATL-100-DM-W-01",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Unload & blow-off",
+          "setupMin": 0,
+          "cycleMin": 1.9,
+          "labourMin": 2.1,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 90,
+          "description": "Manual deburr",
+          "assetId": "CELL-A-DEBURR-03",
+          "setupMin": 5,
+          "cycleMin": 2.9,
+          "labourMin": 3.1,
+          "skillId": "SK-GEN",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 100,
+          "description": "Aqueous wash",
+          "assetId": "CELL-A-WASH-04",
+          "setupMin": 5,
+          "cycleMin": 3.1,
+          "labourMin": 1.3,
+          "skillId": "SK-GEN",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 110,
+          "description": "CMM first-off / sample inspection",
+          "assetId": "CELL-A-CMM-02",
+          "setupMin": 5,
+          "cycleMin": 2,
+          "labourMin": 0.9,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 120,
+          "description": "Visual inspection & paperwork",
+          "setupMin": 0,
+          "cycleMin": 1.2,
+          "labourMin": 1.3,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 130,
+          "description": "Mark, bag & tag",
+          "setupMin": 0,
+          "cycleMin": 1.4,
+          "labourMin": 1.5,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 140,
+          "description": "Move to despatch buffer",
+          "setupMin": 0,
+          "cycleMin": 1.6,
+          "labourMin": 1.7,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    },
+    {
+      "routeId": "RT-BOR-100-PM-C-02",
+      "variantId": "BOR-100-PM-C-02",
+      "productFamily": "BOREAS",
+      "description": "Piston",
+      "batchSize": 20,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Kit & stage material",
+          "setupMin": 0,
+          "cycleMin": 1.1,
+          "labourMin": 1.2,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Load & clamp in fixture",
+          "setupMin": 0,
+          "cycleMin": 1.3,
+          "labourMin": 1.4,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "OP10 Rough machine datum faces",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 41,
+          "cycleMin": 2.3,
+          "labourMin": 0.7,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-BOR-100-PM-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "OP20 Semi-finish profile",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 41,
+          "cycleMin": 3.1,
+          "labourMin": 1.1,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-BOR-100-PM-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "OP30 Finish machine bores",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 41,
+          "cycleMin": 2.1,
+          "labourMin": 0.8,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-BOR-100-PM-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 60,
+          "description": "OP40 Drill & tap",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 41,
+          "cycleMin": 2.3,
+          "labourMin": 0.8,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-BOR-100-PM-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 70,
+          "description": "Tool change & offset check",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 41,
+          "cycleMin": 3.4,
+          "labourMin": 0.9,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-BOR-100-PM-C-02",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Unload & blow-off",
+          "setupMin": 0,
+          "cycleMin": 2.1,
+          "labourMin": 2.3,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 90,
+          "description": "Manual deburr",
+          "assetId": "CELL-A-DEBURR-03",
+          "setupMin": 5,
+          "cycleMin": 1.4,
+          "labourMin": 1.5,
+          "skillId": "SK-GEN",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 100,
+          "description": "CMM first-off / sample inspection",
+          "assetId": "CELL-A-CMM-02",
+          "setupMin": 5,
+          "cycleMin": 2.8,
+          "labourMin": 1.2,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 110,
+          "description": "Visual inspection & paperwork",
+          "setupMin": 0,
+          "cycleMin": 1.9,
+          "labourMin": 2.1,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 120,
+          "description": "Mark, bag & tag",
+          "setupMin": 0,
+          "cycleMin": 1.5,
+          "labourMin": 1.6,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 130,
+          "description": "Move to despatch buffer",
+          "setupMin": 0,
+          "cycleMin": 1.6,
+          "labourMin": 1.7,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    },
+    {
+      "routeId": "RT-CIR-OS-C-02",
+      "variantId": "CIR-OS-C-02",
+      "productFamily": "CIRRUS",
+      "description": "Inspection Cover",
+      "batchSize": 20,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Kit & stage material",
+          "setupMin": 0,
+          "cycleMin": 2.6,
+          "labourMin": 2.8,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Load & clamp in fixture",
+          "setupMin": 0,
+          "cycleMin": 1.4,
+          "labourMin": 1.5,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "OP10 Rough machine datum faces",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 46,
+          "cycleMin": 3.3,
+          "labourMin": 0.9,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-CIR-OS-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "OP20 Semi-finish profile",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 46,
+          "cycleMin": 1.8,
+          "labourMin": 0.7,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-CIR-OS-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "In-process probing",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 46,
+          "cycleMin": 1.8,
+          "labourMin": 0.5,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-CIR-OS-C-02",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 60,
+          "description": "OP30 Finish machine bores",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 46,
+          "cycleMin": 2.9,
+          "labourMin": 1.1,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-CIR-OS-C-02",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 70,
+          "description": "Tool change & offset check",
+          "assetId": "CELL-A-VMC5-01",
+          "setupMin": 46,
+          "cycleMin": 1.7,
+          "labourMin": 0.4,
+          "skillId": "SK-CNC",
+          "toolingId": "FX-CIR-OS-C-02",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Unload & blow-off",
+          "setupMin": 0,
+          "cycleMin": 2.2,
+          "labourMin": 2.4,
+          "skillId": "SK-CNC",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 90,
+          "description": "Manual deburr",
+          "assetId": "CELL-A-DEBURR-03",
+          "setupMin": 5,
+          "cycleMin": 3.3,
+          "labourMin": 3.6,
+          "skillId": "SK-GEN",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 100,
+          "description": "CMM first-off / sample inspection",
+          "assetId": "CELL-A-CMM-02",
+          "setupMin": 5,
+          "cycleMin": 2.2,
+          "labourMin": 0.9,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 110,
+          "description": "Visual inspection & paperwork",
+          "setupMin": 0,
+          "cycleMin": 1.1,
+          "labourMin": 1.2,
+          "skillId": "SK-CMM",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 120,
+          "description": "Mark, bag & tag",
+          "setupMin": 0,
+          "cycleMin": 2.3,
+          "labourMin": 2.5,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 130,
+          "description": "Move to despatch buffer",
+          "setupMin": 0,
+          "cycleMin": 1.7,
+          "labourMin": 1.8,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    }
+  ],
+  "serviceAllowance": {
+    "electricalKw": 134,
+    "airLpm": 1606,
+    "extractionM3h": 2670,
+    "craneTonnes": 1,
+    "coolantLpm": 192
+  },
+  "gateNotes": "Cell Design Passport baseline — Gate 3 (Design Freeze) passed"
+}

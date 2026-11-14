@@ -1,0 +1,230 @@
+{
+  "passportId": "PP-F4-C10",
+  "schemaVersion": "1.0",
+  "cellId": "F4-C10",
+  "cellName": "Test Cell 02",
+  "factory": "F4",
+  "revision": 3,
+  "issuedAt": "2026-10-13T00:00:00.000Z",
+  "gateStatus": "PASSED",
+  "shiftPattern": {
+    "shiftsPerDay": 3,
+    "hoursPerShift": 7.5,
+    "daysPerWeek": 5
+  },
+  "assets": [
+    {
+      "assetId": "F4-C10-TEST-01",
+      "qty": 2
+    },
+    {
+      "assetId": "F4-C10-LEAK-02",
+      "qty": 1
+    }
+  ],
+  "fixtures": [],
+  "crew": [
+    {
+      "operatorId": "F4-C10-OP01",
+      "name": "Operator F4-C101",
+      "roleId": "R-TST",
+      "competence": {
+        "SK-TEST": 2
+      }
+    },
+    {
+      "operatorId": "F4-C10-OP02",
+      "name": "Operator F4-C102",
+      "roleId": "R-TST",
+      "competence": {
+        "SK-TEST": 3,
+        "SK-GEN": 0
+      }
+    },
+    {
+      "operatorId": "F4-C10-OP03",
+      "name": "Operator F4-C103",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 3
+      }
+    },
+    {
+      "operatorId": "F4-C10-OP04",
+      "name": "Trainee F4-C104",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 1
+      }
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "RT-ATL-200",
+      "variantId": "ATL-200",
+      "productFamily": "ATLAS",
+      "description": "ATLAS Electro-Mechanical Actuator 200",
+      "batchSize": 6,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Load unit to rig",
+          "setupMin": 0,
+          "cycleMin": 2.8,
+          "labourMin": 2.8,
+          "skillId": "SK-TEST",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Connect services",
+          "setupMin": 0,
+          "cycleMin": 1.7,
+          "labourMin": 1.7,
+          "skillId": "SK-TEST",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "Functional run-in",
+          "assetId": "F4-C10-TEST-01",
+          "setupMin": 5,
+          "cycleMin": 66.9,
+          "labourMin": 18.2,
+          "skillId": "SK-TEST",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "Performance test",
+          "assetId": "F4-C10-TEST-01",
+          "setupMin": 5,
+          "cycleMin": 65.1,
+          "labourMin": 16.1,
+          "skillId": "SK-TEST",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "Endurance soak",
+          "assetId": "F4-C10-TEST-01",
+          "setupMin": 5,
+          "cycleMin": 61.9,
+          "labourMin": 20.6,
+          "skillId": "SK-TEST",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 60,
+          "description": "Leak / proof test",
+          "assetId": "F4-C10-LEAK-02",
+          "setupMin": 5,
+          "cycleMin": 15.5,
+          "labourMin": 6.2,
+          "skillId": "SK-TEST",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 70,
+          "description": "Certificate of conformity",
+          "setupMin": 0,
+          "cycleMin": 6.1,
+          "labourMin": 6.1,
+          "skillId": "SK-TEST",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Pack for despatch",
+          "setupMin": 0,
+          "cycleMin": 3.4,
+          "labourMin": 3.4,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    },
+    {
+      "routeId": "RT-CIR-200",
+      "variantId": "CIR-200",
+      "productFamily": "CIRRUS",
+      "description": "CIRRUS Industrial Gearbox 200",
+      "batchSize": 6,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Load unit to rig",
+          "setupMin": 0,
+          "cycleMin": 5.7,
+          "labourMin": 5.7,
+          "skillId": "SK-TEST",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Connect services",
+          "setupMin": 0,
+          "cycleMin": 3.3,
+          "labourMin": 3.3,
+          "skillId": "SK-TEST",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "Functional run-in",
+          "assetId": "F4-C10-TEST-01",
+          "setupMin": 5,
+          "cycleMin": 67.2,
+          "labourMin": 15.1,
+          "skillId": "SK-TEST",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "Performance test",
+          "assetId": "F4-C10-TEST-01",
+          "setupMin": 5,
+          "cycleMin": 95.4,
+          "labourMin": 29.6,
+          "skillId": "SK-TEST",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "Leak / proof test",
+          "assetId": "F4-C10-LEAK-02",
+          "setupMin": 5,
+          "cycleMin": 11.4,
+          "labourMin": 4.6,
+          "skillId": "SK-TEST",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 60,
+          "description": "Certificate of conformity",
+          "setupMin": 0,
+          "cycleMin": 3.4,
+          "labourMin": 3.4,
+          "skillId": "SK-TEST",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 70,
+          "description": "Pack for despatch",
+          "setupMin": 0,
+          "cycleMin": 1.7,
+          "labourMin": 1.7,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    }
+  ],
+  "serviceAllowance": {
+    "electricalKw": 94,
+    "airLpm": 1406,
+    "extractionM3h": 0,
+    "craneTonnes": 1,
+    "coolantLpm": 97
+  }
+}

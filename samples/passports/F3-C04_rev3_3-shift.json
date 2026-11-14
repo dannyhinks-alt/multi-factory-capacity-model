@@ -1,0 +1,153 @@
+{
+  "passportId": "PP-F3-C04",
+  "schemaVersion": "1.0",
+  "cellId": "F3-C04",
+  "cellName": "Paint Line 02",
+  "factory": "F3",
+  "revision": 3,
+  "issuedAt": "2026-07-06T00:00:00.000Z",
+  "gateStatus": "PASSED",
+  "shiftPattern": {
+    "shiftsPerDay": 3,
+    "hoursPerShift": 7.5,
+    "daysPerWeek": 5
+  },
+  "assets": [
+    {
+      "assetId": "F3-C04-PAINT-01",
+      "qty": 1
+    },
+    {
+      "assetId": "F3-C04-OVEN-02",
+      "qty": 1
+    }
+  ],
+  "fixtures": [],
+  "crew": [
+    {
+      "operatorId": "F3-C04-OP01",
+      "name": "Operator F3-C041",
+      "roleId": "R-SFT",
+      "competence": {
+        "SK-FIN": 2
+      }
+    },
+    {
+      "operatorId": "F3-C04-OP02",
+      "name": "Trainee F3-C042",
+      "roleId": "R-SFT",
+      "competence": {
+        "SK-FIN": 1
+      }
+    },
+    {
+      "operatorId": "F3-C04-OP03",
+      "name": "Operator F3-C043",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 2
+      }
+    },
+    {
+      "operatorId": "F3-C04-OP04",
+      "name": "Trainee F3-C044",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 1
+      }
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "RT-BOR-100-PM-C",
+      "variantId": "BOR-100-PM-C",
+      "productFamily": "BOREAS",
+      "description": "Pump Module Coated Frame",
+      "batchSize": 24,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Receive & jig hang",
+          "setupMin": 0,
+          "cycleMin": 5.5,
+          "labourMin": 5.5,
+          "skillId": "SK-FIN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Mask features",
+          "setupMin": 0,
+          "cycleMin": 6.5,
+          "labourMin": 6.5,
+          "skillId": "SK-FIN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 30,
+          "description": "Primary process",
+          "assetId": "F3-C04-PAINT-01",
+          "setupMin": 21,
+          "cycleMin": 62.6,
+          "labourMin": 15.6,
+          "skillId": "SK-FIN",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "Second coat / pass",
+          "assetId": "F3-C04-PAINT-01",
+          "setupMin": 21,
+          "cycleMin": 95.6,
+          "labourMin": 32.2,
+          "skillId": "SK-FIN",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "Cure / flash-off",
+          "assetId": "F3-C04-OVEN-02",
+          "setupMin": 5,
+          "cycleMin": 29.9,
+          "labourMin": 11.9,
+          "skillId": "SK-FIN",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 60,
+          "description": "De-mask",
+          "setupMin": 0,
+          "cycleMin": 3.2,
+          "labourMin": 3.2,
+          "skillId": "SK-FIN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 70,
+          "description": "DFT & adhesion check",
+          "setupMin": 0,
+          "cycleMin": 4.5,
+          "labourMin": 4.5,
+          "skillId": "SK-FIN",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Pack & despatch to F4",
+          "setupMin": 0,
+          "cycleMin": 3.2,
+          "labourMin": 3.2,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    }
+  ],
+  "serviceAllowance": {
+    "electricalKw": 186,
+    "airLpm": 2058,
+    "extractionM3h": 27049,
+    "craneTonnes": 2,
+    "coolantLpm": 0
+  }
+}
