@@ -1,0 +1,10 @@
+Role ID,Skill ID,Description,Hourly Rate £/hr
+R-MCH,SK-CNC,CNC Machinist,24.5
+R-INS,SK-CMM,Quality Inspector (CMM),26
+R-GEN,SK-GEN,General Operative,19
+R-FAB,SK-FAB,Sheet Metal Fabricator,23
+R-WLD,SK-WELD,Coded Welder,27
+R-SFT,SK-FIN,Surface Finishing Operative,21
+R-CHM,SK-CHEM,Process Chemistry Technician,25
+R-FIT,SK-ASSY,Mechanical Fitter,23.5
+R-TST,SK-TEST,Test Technician,27.5
