@@ -2,9 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { buildSeedState } from '../data/seed';
 import { computeModel, type HubModel } from '../engine/model';
 import type { AuditAction, HubState, SignOffStatus } from '../engine/types';
-import { carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
+import { canPromote, carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
 import { deleteScenarioStore, listSnapshots, loadScenarios, loadState, migrateState, pushSnapshot, saveScenario, saveState, type Snapshot } from './persistence';
 import { createScenario, editScenario, LIVE_ID, type Scenario } from '../engine/scenario';
+import type { SmartKind } from '../engine/smartimport';
 
 interface HubCtx {
   state: HubState;
@@ -32,6 +33,17 @@ interface HubCtx {
   /** Which state Workspace 6 (DES) exports: 'live' or a scenario ID. */
   desSourceId: string;
   setDesSourceId: (id: string) => void;
+  /** Universal Smart Import hand-off (V1.4): a detected file waiting for its target view to pick it up. */
+  pendingImport: PendingImport | null;
+  setPendingImport: (p: PendingImport | null) => void;
+  /** Consume the pending import if it is one of `kinds` (returns null otherwise). */
+  takePendingImport: (kinds: SmartKind[]) => PendingImport | null;
+}
+
+export interface PendingImport {
+  kind: SmartKind;
+  file: File;
+  sheet?: string;
 }
 
 const Ctx = createContext<HubCtx | null>(null);
@@ -46,6 +58,19 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [desSourceId, setDesSourceId] = useState<string>(LIVE_ID);
+  const [pendingImport, setPendingImportState] = useState<PendingImport | null>(null);
+  const pendingRef = useRef<PendingImport | null>(null);
+  const setPendingImport = useCallback((p: PendingImport | null) => {
+    pendingRef.current = p;
+    setPendingImportState(p);
+  }, []);
+  const takePendingImport = useCallback((kinds: SmartKind[]) => {
+    const p = pendingRef.current;
+    if (!p || !kinds.includes(p.kind)) return null;
+    pendingRef.current = null;
+    setPendingImportState(null);
+    return p;
+  }, []);
   const scenariosRef = useRef<Scenario[]>([]);
   /** Single writer for scenario list so chained calls (create → edit) see each other immediately. */
   const commitScenarios = (list: Scenario[]) => {
@@ -159,6 +184,9 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const promoteScenario = useCallback(async (id: string) => {
     const sc = scenariosRef.current.find((s) => s.id === id);
     if (!sc) return;
+    // Governance gate (Dictionary): optionally require Reviewed / Approved before promotion.
+    const gate = canPromote(sc.status, state.settings);
+    if (!gate.ok) throw new Error(gate.reason);
     setSnapshots(await pushSnapshot(state, `Before promoting scenario “${sc.name}”`));
     lastSnap.current = Date.now();
     const at = new Date().toISOString();
@@ -184,7 +212,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const model = useMemo(() => computeModel(state), [state]);
 
   return (
-    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId }}>
+    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId, pendingImport, setPendingImport, takePendingImport }}>
       {children}
     </Ctx.Provider>
   );

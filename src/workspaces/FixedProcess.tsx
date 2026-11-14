@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
 import { Badge, Button, Card, DropZone, Empty, Pills, Stat, download, fmtNum, input, td, tdNum, th } from '../components/ui';
 import { toCsv } from '../engine/csv';
@@ -36,13 +36,22 @@ const pctTxt = (n: number) => (Number.isFinite(n) ? `${n >= 0 ? '+' : '−'}${Ma
  * reconciliation of Working Cell Routes (or any scenario) and the Compare / Ingest Updated Revision workflow.
  */
 export default function FixedProcess({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { state, scenarios } = useHub();
+  const { state, scenarios, takePendingImport, pendingImport } = useHub();
   const [sourceId, setSourceId] = useState(LIVE_ID);
+  const [tab, setTab] = useState<'drift' | 'baseline' | 'revision'>('drift');
+  // Smart Import hand-off: open the revision diff with the detected file pre-loaded.
+  const [incomingFile, setIncomingFile] = useState<File | null>(null);
+  useEffect(() => {
+    const p = takePendingImport(['fixed-process']);
+    if (p) {
+      setIncomingFile(p.file);
+      setTab('revision');
+    }
+  }, [pendingImport]);
   const source = scenarios.find((s) => s.id === sourceId);
   const src = source?.state ?? state;
   const report = useMemo(() => reconcile(src), [src]);
   const fp = state.fixedProcess;
-  const [tab, setTab] = useState<'drift' | 'baseline' | 'revision'>('drift');
   return (
     <>
       <Card
@@ -73,7 +82,7 @@ export default function FixedProcess({ navigate }: { navigate: (t: NavTarget) =>
       <Pills value={tab} onChange={setTab} options={[{ value: 'drift', label: 'Live Drift Reconciliation' }, { value: 'baseline', label: 'Locked Baseline Documents' }, { value: 'revision', label: 'Compare / Ingest Updated Revision' }]} />
       {tab === 'drift' && <DriftView items={report.items} byCell={report.byCell} readOnly={!!source} navigate={navigate} />}
       {tab === 'baseline' && <BaselineView />}
-      {tab === 'revision' && <RevisionView />}
+      {tab === 'revision' && <RevisionView initialFile={incomingFile} />}
     </>
   );
 }
@@ -214,7 +223,7 @@ function BaselineView() {
   );
 }
 
-function RevisionView() {
+function RevisionView({ initialFile }: { initialFile?: File | null }) {
   const { state, update } = useHub();
   const [sheets, setSheets] = useState<SheetData[] | null>(null);
   const [sheetIdx, setSheetIdx] = useState(0);
@@ -240,6 +249,10 @@ function RevisionView() {
       alert(`Could not read file: ${(e as Error).message}`);
     }
   };
+  useEffect(() => {
+    if (initialFile) void load([initialFile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
   const reparse = (m: Record<string, string>, idx = sheetIdx) => {
     setMapping(m);
     const p = parseFixedRows(sheets?.[idx]?.rows ?? [], m);

@@ -343,11 +343,41 @@ export function setToolingDwell(s: HubState, cellId: string, toolingId: string, 
   return `${cellId} ${toolingId}: max dwell ${maxDwellPct}%${qty !== undefined ? `, qty ${qty}` : ''}`;
 }
 
+/**
+ * Quick shift-pattern change for a cell (1/2/3 shifts). With `adjustCrew`, a matching shift crew is
+ * recruited (cloned competences) when adding shifts, or released when removing shifts, so the
+ * Competent Labour ≥ 2 cap scales with the pattern.
+ */
+export function setShiftPattern(s: HubState, cellId: string, shifts: number, adjustCrew = true): string {
+  const p = passport(s, cellId);
+  const from = p.shiftPattern.shiftsPerDay;
+  const to = Math.min(3, Math.max(1, Math.round(shifts)));
+  if (from === to) return `${cellId} already on ${to} shift${to > 1 ? 's' : ''}`;
+  let crewNote = '';
+  if (adjustCrew && from > 0) {
+    const perShift = Math.ceil(p.crew.length / from);
+    if (to > from) {
+      const added = Array.from({ length: (to - from) * perShift }, (_, i) => {
+        const src = p.crew[i % Math.max(1, p.crew.length)];
+        return { ...clone(src), operatorId: `${cellId}-SH${to}-${i + 1}`, name: `${src.name} (shift ${from + 1 + Math.floor(i / perShift)})` };
+      });
+      p.crew.push(...added);
+      crewNote = `, +${added.length} operators`;
+    } else {
+      const keep = Math.max(1, perShift * to);
+      crewNote = `, −${Math.max(0, p.crew.length - keep)} operators`;
+      p.crew = p.crew.slice(0, keep);
+    }
+  }
+  p.shiftPattern.shiftsPerDay = to;
+  return `${cellId} shift pattern ${from} → ${to} shifts/day${crewNote}`;
+}
+
 /** Override (or clear) a folded Macro-Block directly; micro-ops are re-scaled and re-folded. */
 export function setMacroOverride(s: HubState, cellId: string, routeId: string, o: MacroOverride | null): string {
   const key = routeKey(cellId, routeId);
   const next = { ...(s.macroOverrides ?? {}) };
-  if (!o || (o.setupMin === undefined && o.cycleMin === undefined && o.batchSize === undefined)) delete next[key];
+  if (!o || (o.setupMin === undefined && o.cycleMin === undefined && o.batchSize === undefined && o.oeePct === undefined)) delete next[key];
   else next[key] = o;
   s.macroOverrides = next;
   return o ? `Macro override ${cellId}/${routeId}: ${Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${v}`).join(', ')}` : `Cleared macro override ${cellId}/${routeId}`;
@@ -1208,4 +1238,44 @@ th{background:#f1f5f9}.good{color:#006300}.bad,.critical{color:#b42318}.warning{
 @media print{body{margin:8mm}h2{page-break-before:auto}}</style></head><body>
 <h1>Scenario Comparison Report</h1><p>Multi-Factory Master Control Hub · generated ${new Date().toLocaleString('en-GB')} · baseline: ${esc(base.name)}</p>
 <table><thead>${head}</thead><tbody>${body}</tbody></table>${chains}</body></html>`;
+}
+
+export interface FactorySpaceRow {
+  factory: FactoryId;
+  cellsBase: number;
+  cellsScenario: number;
+  /** Cells incl. 8 m² fixed + 20% uplift and 35% circulation. */
+  cellCirculationBaseM2: number;
+  cellCirculationScenarioM2: number;
+  storesBaseM2: number;
+  storesScenarioM2: number;
+  /** Cells + circulation + stores & buffers — the same total as Workspace 1 and the Buffers & Stores view. */
+  totalBaseM2: number;
+  totalScenarioM2: number;
+  ceilingM2: number;
+  scenarioPctOfCeiling: number;
+  overCeiling: boolean;
+}
+
+/** Factory space table for Workspace 7 (Cell vs Cells): cell + circulation and total incl. stores vs floor ceiling. */
+export function factorySpaceRows(base: ScenarioEvaluation, sc: ScenarioEvaluation): FactorySpaceRow[] {
+  return FACTORIES.map((f) => {
+    const kb = factoryKpis(base.model, base.state, f);
+    const ks = factoryKpis(sc.model, sc.state, f);
+    const ceiling = sc.state.utilities.find((u) => u.factory === f)?.floorAreaM2 ?? 0;
+    return {
+      factory: f,
+      cellsBase: kb.cells,
+      cellsScenario: ks.cells,
+      cellCirculationBaseM2: kb.factoryFootprintM2,
+      cellCirculationScenarioM2: ks.factoryFootprintM2,
+      storesBaseM2: kb.storesFootprintM2,
+      storesScenarioM2: ks.storesFootprintM2,
+      totalBaseM2: kb.totalFootprintM2,
+      totalScenarioM2: ks.totalFootprintM2,
+      ceilingM2: ceiling,
+      scenarioPctOfCeiling: ceiling > 0 ? (ks.totalFootprintM2 / ceiling) * 100 : 0,
+      overCeiling: ceiling > 0 && ks.totalFootprintM2 > ceiling,
+    };
+  });
 }

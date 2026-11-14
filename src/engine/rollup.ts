@@ -227,10 +227,15 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
   let machineCap = Infinity;
   let oeeWeighted = 0;
   let oeeWeight = 0;
+  // Optional route-level Effective OEE override (V1.4): the route's machine load is re-expressed at the
+  // asset's own OEE so cell-level resource utilisation stays consistent with the overridden macro-block.
+  const ovr = route.oeeOverridePct !== undefined ? Math.min(100, Math.max(5, route.oeeOverridePct)) / 100 : undefined;
   for (const [assetId, load] of Object.entries(assetLoad)) {
     const a = assetById.get(assetId);
     const qty = a ? a.qty : 0; // asset not present in the cell → starved (zero machine capacity)
-    const oee = (a?.oeePct ?? ctx.settings.complexityPct.C) / 100;
+    const assetOee = (a?.oeePct ?? ctx.settings.complexityPct.C) / 100;
+    const oee = ovr ?? assetOee;
+    if (ovr) assetLoad[assetId] = (load * assetOee) / ovr;
     const perMachineCycle = qty > 0 ? (assetCycle[assetId] ?? 0) / qty : assetCycle[assetId] ?? 0;
     if (perMachineCycle > bottleneckCycle) {
       bottleneckCycle = perMachineCycle;

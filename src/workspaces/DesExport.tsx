@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
 import { Badge, Button, Card, DropZone, FactoryFilter, Pills, Stat, download, fmtNum, fmtPct, input, td, tdNum, th } from '../components/ui';
 import { computeModel } from '../engine/model';
@@ -18,6 +18,21 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
   const [scope, setScope] = useState<FactoryId | 'All'>('All');
   const [msg, setMsg] = useState('');
   const [preset, setPreset] = useState<'generic' | 'tecnomatix'>('generic');
+  // Smart Import hand-off: Plant Simulation statistics → Tecnomatix validation; DES results → generic validation.
+  const { takePendingImport, pendingImport } = useHub();
+  const [statsFile, setStatsFile] = useState<File | null>(null);
+  useEffect(() => {
+    const p = takePendingImport(['plantsim-stats', 'des-results']);
+    if (!p) return;
+    if (p.kind === 'plantsim-stats') {
+      setPreset('tecnomatix');
+      setStatsFile(p.file);
+    } else {
+      setPreset('generic');
+      void importResults([p.file]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport]);
   const routing = useMemo(() => buildDesRouting(model).filter((r) => scope === 'All' || r.factory === scope), [model, scope]);
   const schedule = useMemo(() => buildDesSchedule(routing), [routing]);
   const comparison = useMemo(() => compareDes(model, state.desResults, state.settings).filter((c) => scope === 'All' || c.factory === scope), [model, state.desResults, state.settings, scope]);
@@ -63,7 +78,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
         label="Export preset"
         options={[{ value: 'generic', label: 'Generic DES (CSV / JSON)' }, { value: 'tecnomatix', label: 'Siemens Tecnomatix Plant Simulation' }]}
       />
-      {preset === 'tecnomatix' ? <TecnomatixPanel model={model} state={state} sourceName={source ? source.name : 'Live Baseline'} navigate={navigate} /> : (<>
+      {preset === 'tecnomatix' ? <TecnomatixPanel model={model} state={state} sourceName={source ? source.name : 'Live Baseline'} navigate={navigate} initialStatsFile={statsFile} /> : (<>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Micro-steps folded" value={fmtNum(microOps)} sub="from Cell Passports" />
         <Stat label="DES macro-operations" value={fmtNum(routing.length)} sub={`${routing.length ? (microOps / routing.length).toFixed(1) : 0} : 1 fold`} />

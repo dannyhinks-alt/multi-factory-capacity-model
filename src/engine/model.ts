@@ -125,7 +125,7 @@ export function applyMacroOverrides(passports: CellPassport[], overrides: HubSta
             ops = ops.map((x) => ({ ...x, cycleMin: x.cycleMin * k, labourMin: x.labourMin !== undefined ? x.labourMin * k : undefined }));
           }
         }
-        return { ...r, ops, batchSize: o.batchSize ?? r.batchSize };
+        return { ...r, ops, batchSize: o.batchSize ?? r.batchSize, oeeOverridePct: o.oeePct ?? r.oeeOverridePct };
       }),
     };
   });

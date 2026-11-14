@@ -11022,6 +11022,101 @@
               "vaType": "NVA"
             }
           ]
+        },
+        {
+          "routeId": "RT-CIR-200-IS",
+          "variantId": "CIR-200-IS",
+          "productFamily": "CIRRUS",
+          "description": "CIRRUS Input Stage 200",
+          "batchSize": 6,
+          "ops": [
+            {
+              "opNo": 10,
+              "description": "Kit parts to station",
+              "setupMin": 0,
+              "cycleMin": 4.2,
+              "labourMin": 4.2,
+              "skillId": "SK-GEN",
+              "vaType": "NVA"
+            },
+            {
+              "opNo": 20,
+              "description": "Sub-assemble bearings & seals",
+              "assetId": "F4-C08-ASSY-01",
+              "setupMin": 5,
+              "cycleMin": 22.5,
+              "labourMin": 22.5,
+              "skillId": "SK-ASSY",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 30,
+              "description": "Fit main components",
+              "assetId": "F4-C08-ASSY-01",
+              "setupMin": 5,
+              "cycleMin": 30.7,
+              "labourMin": 30.7,
+              "skillId": "SK-ASSY",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 40,
+              "description": "Fit fasteners",
+              "assetId": "F4-C08-ASSY-01",
+              "setupMin": 5,
+              "cycleMin": 38,
+              "labourMin": 38,
+              "skillId": "SK-ASSY",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 50,
+              "description": "Torque critical joints",
+              "assetId": "F4-C08-TORQ-02",
+              "setupMin": 5,
+              "cycleMin": 10,
+              "labourMin": 4,
+              "skillId": "SK-ASSY",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 60,
+              "description": "Witness mark & record",
+              "setupMin": 0,
+              "cycleMin": 5.3,
+              "labourMin": 5.3,
+              "skillId": "SK-ASSY",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 70,
+              "description": "Leak test",
+              "assetId": "F4-C08-LEAK-03",
+              "setupMin": 5,
+              "cycleMin": 9.6,
+              "labourMin": 3.9,
+              "skillId": "SK-TEST",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 80,
+              "description": "Final visual & label",
+              "setupMin": 0,
+              "cycleMin": 3.7,
+              "labourMin": 3.7,
+              "skillId": "SK-ASSY",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 90,
+              "description": "Transfer to test",
+              "setupMin": 0,
+              "cycleMin": 6.2,
+              "labourMin": 6.2,
+              "skillId": "SK-GEN",
+              "vaType": "NVA"
+            }
+          ]
         }
       ],
       "serviceAllowance": {

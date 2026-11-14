@@ -68,7 +68,16 @@ Build an offline-first React + TypeScript + Vite + Tailwind CSS web application 
    - Compare / Ingest Updated Fixed Process Revision diffs Rev N → Rev N+1 against the locked baseline and the Working Factory Design (deviations falling back into alignment, newly deviating ops, impacted cells) before locking (audited `Fixed Process revision`).
    - 1-click New Fixed Process Release / ECR Pack (`.xlsx` 5 sheets / `.csv` / print-ready sign-off pack) of approved, justified drifts with cycle/setup deltas, proposed Rev N+1 steps and working macro-blocks; can be issued & locked as the next revision.
 
-## 6. Data Safety & Offline Single-File Build
+## 6. V1.4: UX Simplification, Guided Action Strip & Logic-Link Tightening
+1. **Universal Smart File Drop-Zone** (header **⬆ Smart Import**): drop any `.json` / `.xlsx` / `.csv`; the hub detects Cell Design Passports, Fixed Process Baseline / Revision, Master Assets / Fixtures / Skills, Legacy Capacity/BOM Workbook, Siemens Plant Simulation Statistics, DES results or a Full-Plant Backup (with confidence, reason and alternatives) and jumps into the matching import / diff preview with the file pre-loaded (backups restore after confirmation and snapshot).
+2. **Guided Next Actions strip** at the top of Phase 1 (Factory Control Hub), driven by the Ingestion Audit, Fixed Process Drift and Logic Integrity engines (unmapped BOM nodes with 1-click **Auto-Match**, compliance deviations, gate-blocked cells, bottlenecks, utility / space overruns, integrity errors, drifts awaiting justification, ECR-ready drifts, baseline sign-off) with jump buttons.
+   - **Executive View / Full Engineering** toggle in the top bar: Executive View shows Factory Control Hub, IDEF0 / Swimlane Map, Static Scenario Planner and Validation / ECR outputs; Full Engineering shows all 15 views. Jumping to an engineering-only view switches mode automatically.
+3. **Logic-link & governance tightening:**
+   - Workspace 7 (Cell vs Cells) factory space table shows Cells + Circulation m², Stores & Buffers m² and Total m² against each factory's `floorAreaM2` — the same basis as Workspace 1 and Buffers & Stores.
+   - Route vs Route Macro-Block editor: optional **Effective OEE %** override and quick **Shift Pattern** (1/2/3 shifts, matching crew recruited/released).
+   - Dictionary Defaults governance toggle: **Require Reviewed/Approved status before promoting Scenario to Live Baseline** (enforced in the UI and in the promotion itself).
+
+## 7. Data Safety & Offline Single-File Build
 - Persist state + rolling 5 auto-snapshots + Workspace 7 scenarios + governance audit log in `IndexedDB` (`multi-factory-hub-v1`, schema v2) with `localStorage` fallback and 1-click `.json` full-plant backup/restore.
 - Include `README.md`, JSDoc comments on core calculation functions, and `.github/workflows/ci.yml`.
 - Bundle everything locally with zero external CDNs (`npm run build:offline` → `dist-offline/index.html`) and force-add `dist-offline/index.html` to Git.

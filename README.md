@@ -11,7 +11,7 @@ The whole application builds to a single self-contained file, `dist-offline/inde
 ```bash
 npm ci
 npm run dev             # http://localhost:5173
-npm test                # 126 unit tests (Vitest)
+npm test                # 149 unit tests (Vitest)
 npm run build:offline   # → dist-offline/index.html (single file, zero external CDNs)
 npm run samples         # regenerate example input files under samples/
 ```
@@ -30,6 +30,35 @@ There is no sidebar any more. The top bar shows four phase tabs, and each phase 
 | **4 · Validation & Outputs** | Siemens Plant Simulation (Tecnomatix) · **Fixed Process ECR Pack** · Spec Sheets |
 
 The workspaces described below sit within these phases.
+
+**Executive View / Full Engineering (V1.4).**
+- **Toggle:** a top-bar toggle switches between the two modes, and the choice is remembered.
+- **Executive View:** shows only Factory Control Hub, IDEF0 / Swimlane Map, Static Scenario Planner, Siemens Plant Simulation, Fixed Process ECR Pack and Spec Sheets. Phase 2 is hidden.
+- **Full Engineering:** shows all 15 views.
+- **Switching:** jumping to an engineering-only view, for example from a Next Action, switches to Full Engineering automatically.
+
+**⬆ Smart Import (V1.4).** The header button opens a universal drop-zone. Drop any `.json`, `.xlsx` or `.csv` and `src/engine/smartimport.ts` detects what it is, shows a confidence, the reason and any alternatives, then opens the matching preview with the file already loaded:
+
+| Detected | Opens |
+|---|---|
+| Cell Design Passports (single, array or bundle) | Cell Passports: ingestion preview showing add / update / skip-older-revision |
+| Fixed Process Baseline / Revision | Fixed Process Baseline → Compare / Ingest revision diff |
+| Master Assets / Fixtures / Skills | Catalogue Importer, with the target, worksheet and fuzzy mapping preset. A multi-sheet workbook offers the other sheets as alternatives |
+| Legacy Capacity / BOM Workbook | Smart Legacy Workbook Importer |
+| Siemens Plant Simulation Statistics | Tecnomatix preset → statistics validation |
+| DES results | Generic DES validation |
+| Full-Plant Backup | Restore, after confirmation and an automatic snapshot |
+
+**Guided Next Actions (V1.4).** A compact strip at the top of the Factory Control Hub ranks the most important actions (`src/engine/nextactions.ts`). It draws on the Ingestion Audit, Fixed Process Drift and Logic Integrity engines, plus capacity, utility and space checks:
+- **Critical:** unmapped BOM nodes, compliance deviations, gate-blocked cells.
+- **Warning:** bottlenecks, Red utilities, factories over their floor ceiling, integrity errors.
+- **Information:** drifts awaiting justification, ECR-ready drifts, baseline sign-off.
+
+Each action has an *Open →* jump. Unmapped BOM nodes also get **⚡ Auto-Match**:
+- **ID matches first:** exact ID matches are always accepted.
+- **Then name similarity:** the best name-similarity suggestion is accepted at 50% or more, but never a route that already serves another BOM part.
+
+The baseline includes a newly ingested `F4-C08 / RT-CIR-200-IS` route whose BOM link has not been run yet, so Auto-Match has a real case to fix. `BOR-MM-W-02` still needs manual mapping.
 
 ## The seven workspaces
 
@@ -161,7 +190,7 @@ The engine is in `src/engine/stores.ts`. It models four storage tiers across F1�
 - **Starvation and blocking:** waiting above 20% flags starvation; blocking above 10% flags blocking. Each flag lists causes such as the in-feed buffer and its upstream cell's utilisation, or a full out-feed buffer and the downstream cell.
 
 ### Logic & Data Integrity
-The check is in `src/engine/integrity.ts`, shown under Master Data → *Logic & Data Integrity*, with a summary in Workspace 1. It reconciles BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services across 28 checks:
+The check is in `src/engine/integrity.ts`, shown under Master Data → *Logic & Data Integrity*, with a summary in Workspace 1. It reconciles BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services across 32 checks (28 from V1.2 plus 4 Fixed Process checks added in V1.3):
 - **BOM:** circular BOM links, orphaned parent IDs, duplicate lines, level jumps, unscheduled L1s.
 - **Routing:** unmapped Make nodes, mappings to missing cells or routes, Buy parts that are mapped, dual-source shares that don't sum to 100%, orphan routes.
 - **Ops:** ops referencing missing machines or tooling, and macro overrides pointing at missing routes.
@@ -184,6 +213,12 @@ The baseline's deliberate exceptions show up as 1 error and 3 warnings.
 
 - **Scenario sign-off:** scenarios have their own sign-off. Editing an approved scenario returns it to Draft.
 - **Audit log:** the structured log records timestamp, action, actor, version from → to, status and details. It survives restores and resets, and exports as `.csv` or `.json`.
+
+### V1.4 logic-link tightening in Workspace 7
+- **Cell vs Cells space table:** shows *Cells + circulation m²*, *Stores & buffers m²* and *Total m² vs floor ceiling* per factory (`factorySpaceRows`). This is the same total as the Workspace 1 footprint tile and the Buffers & Stores space balance.
+- **Effective OEE override:** the Route vs Route Macro-Block override takes an optional **Effective OEE %**. The route's machine load is re-expressed at each asset's OEE, so the macro-block cap and the cell's utilisation stay consistent.
+- **Quick shift selector:** a **Shift Pattern** selector (1 / 2 / 3 shifts) recruits or releases a matching shift crew, so the Competent Labour ≥ 2 cap scales with the pattern.
+- **Promotion gate:** the governance toggle in Dictionary Defaults, *Require Reviewed/Approved status before promoting Scenario to Live Baseline*, locks the promote button for Draft scenarios. The hub also refuses the promotion itself.
 
 ### Editable Dictionary defaults
 Master Data → Dictionary Defaults now also exposes:
@@ -344,6 +379,7 @@ src/engine/     types, bom, rollup, mapping, ingest, model (audit/KPIs/services)
                 services (spec sheet), des, importer, legacy, whatif, scenario (Workspace 7),
                 stores (V1.2), tecnomatix (V1.2), integrity (V1.2), governance (V1.2),
                 fixedprocess (V1.3), systemmap (V1.3),
+                smartimport / nextactions / navigation (V1.4),
                 sheet (SheetJS), csv
 src/data/       deterministic F1–F4 baseline
 src/store/      IndexedDB/localStorage persistence + React context

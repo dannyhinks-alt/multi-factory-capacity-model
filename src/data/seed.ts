@@ -576,11 +576,16 @@ export function buildSeedState(): HubState {
   const missing = masterAssets.findIndex((a) => a.assetId === 'F2-C10-FABT-02');
   if (missing >= 0) masterAssets.splice(missing, 1);
 
+  // A newly ingested route for CIR-200-IS whose BOM link has not been run yet (Guided Next Actions → 1-click Auto-Match).
+  const f4c08 = passports.find((p) => p.cellId === 'F4-C08')!;
+  const tpl = f4c08.routes[0];
+  f4c08.routes.push({ ...tpl, routeId: 'RT-CIR-200-IS', variantId: 'CIR-200-IS', productFamily: 'CIRRUS', description: 'CIRRUS Input Stage 200', ops: tpl.ops.map((o) => ({ ...o })) });
+
   // ---- Mappings via first-upload auto-match
   const uniqueParts = new Map<string, BomLine>();
   for (const b of bom) if (!uniqueParts.has(b.partId)) uniqueParts.set(b.partId, b);
   const now = '2026-11-01T09:00:00.000Z';
-  const mappings = autoMatch([...uniqueParts.values()], passports, [], now);
+  const mappings = autoMatch([...uniqueParts.values()], passports, [], now).filter((m) => m.bomPartId !== 'CIR-200-IS');
 
   // ---- Factory utilities & shared plant
   const ratios: Record<FactoryId, Record<keyof ServiceVector, number>> = {

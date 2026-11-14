@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NavTarget } from '../App';
 import { toCsv } from '../engine/csv';
 import type { HubModel } from '../engine/model';
@@ -14,7 +14,7 @@ const TABLES: (keyof TxExport)[] = ['Routing_DataTable', 'ProductionPlan_DataTab
  * Siemens Tecnomatix Plant Simulation preset: 1-click DataTable export (Live Baseline or any scenario)
  * and Station / Buffer / Drain statistics re-import with AGREE / DISAGREE and starvation / blocking causes.
  */
-export function TecnomatixPanel({ model, state, sourceName, navigate }: { model: HubModel; state: HubState; sourceName: string; navigate: (t: NavTarget) => void }) {
+export function TecnomatixPanel({ model, state, sourceName, navigate, initialStatsFile }: { model: HubModel; state: HubState; sourceName: string; navigate: (t: NavTarget) => void; initialStatsFile?: File | null }) {
   const { update, state: live } = useHub();
   const tx = useMemo(() => buildTecnomatixExport(model, state), [model, state]);
   const [preview, setPreview] = useState<keyof TxExport>('Routing_DataTable');
@@ -41,6 +41,11 @@ export function TecnomatixPanel({ model, state, sourceName, navigate }: { model:
     update((s) => ({ ...s, tecnomatixStats: all, ingestLog: [{ at: new Date().toISOString(), kind: 'des' as const, message: `Imported ${all.length} Plant Simulation statistics rows` }, ...s.ingestLog] }));
     setMsg(`Imported ${all.length} Station / Buffer / Drain statistics rows.`);
   };
+
+  useEffect(() => {
+    if (initialStatsFile) void importStats([initialStatsFile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStatsFile]);
 
   return (
     <>
