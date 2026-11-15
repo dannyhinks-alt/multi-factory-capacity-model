@@ -1,0 +1,298 @@
+{
+  "passportId": "PP-F2-C02",
+  "schemaVersion": "1.0",
+  "cellId": "F2-C02",
+  "cellName": "Robotic Weld Cell 02",
+  "factory": "F2",
+  "revision": 4,
+  "issuedAt": "2026-09-09T00:00:00.000Z",
+  "gateStatus": "PASSED",
+  "shiftPattern": {
+    "shiftsPerDay": 3,
+    "hoursPerShift": 7.5,
+    "daysPerWeek": 5
+  },
+  "assets": [
+    {
+      "assetId": "F2-C02-RWELD-01",
+      "qty": 2
+    },
+    {
+      "assetId": "F2-C02-FABT-02",
+      "qty": 1
+    }
+  ],
+  "fixtures": [
+    {
+      "toolingId": "FX-ATL-HM-W",
+      "qty": 2
+    },
+    {
+      "toolingId": "FX-CIR-OS-W",
+      "qty": 2
+    }
+  ],
+  "crew": [
+    {
+      "operatorId": "F2-C02-OP01",
+      "name": "Operator F2-C021",
+      "roleId": "R-WLD",
+      "competence": {
+        "SK-WELD": 2,
+        "SK-GEN": 0
+      }
+    },
+    {
+      "operatorId": "F2-C02-OP02",
+      "name": "Operator F2-C022",
+      "roleId": "R-WLD",
+      "competence": {
+        "SK-WELD": 3
+      }
+    },
+    {
+      "operatorId": "F2-C02-OP03",
+      "name": "Operator F2-C023",
+      "roleId": "R-FAB",
+      "competence": {
+        "SK-FAB": 2
+      }
+    },
+    {
+      "operatorId": "F2-C02-OP04",
+      "name": "Operator F2-C024",
+      "roleId": "R-GEN",
+      "competence": {
+        "SK-GEN": 3,
+        "SK-FAB": 0
+      }
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "RT-ATL-HM-W",
+      "variantId": "ATL-HM-W",
+      "productFamily": "ATLAS",
+      "description": "Housing Module Weldment",
+      "batchSize": 6,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Kit components to jig",
+          "setupMin": 0,
+          "cycleMin": 2.4,
+          "labourMin": 2.4,
+          "skillId": "SK-WELD",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Tack weld in jig",
+          "assetId": "F2-C02-FABT-02",
+          "setupMin": 5,
+          "cycleMin": 8.9,
+          "labourMin": 8.9,
+          "skillId": "SK-FAB",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 30,
+          "description": "Weld sequence A",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 16,
+          "cycleMin": 11.1,
+          "labourMin": 2.9,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-ATL-HM-W",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "Weld sequence B",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 16,
+          "cycleMin": 9.7,
+          "labourMin": 2,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-ATL-HM-W",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "Flip & re-clamp",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 16,
+          "cycleMin": 8.4,
+          "labourMin": 2.3,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-ATL-HM-W",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 60,
+          "description": "Cool-down dwell",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 16,
+          "cycleMin": 12.3,
+          "labourMin": 3,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-ATL-HM-W",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 70,
+          "description": "Spatter clean & dress",
+          "setupMin": 0,
+          "cycleMin": 2.4,
+          "labourMin": 2.4,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Visual weld inspection",
+          "setupMin": 0,
+          "cycleMin": 4.5,
+          "labourMin": 4.5,
+          "skillId": "SK-WELD",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 90,
+          "description": "Dimensional check on table",
+          "assetId": "F2-C02-FABT-02",
+          "setupMin": 5,
+          "cycleMin": 4.6,
+          "labourMin": 4.6,
+          "skillId": "SK-FAB",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 100,
+          "description": "Move to despatch buffer",
+          "setupMin": 0,
+          "cycleMin": 1,
+          "labourMin": 1,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    },
+    {
+      "routeId": "RT-CIR-OS-W",
+      "variantId": "CIR-OS-W",
+      "productFamily": "CIRRUS",
+      "description": "Output Stage Weldment",
+      "batchSize": 6,
+      "ops": [
+        {
+          "opNo": 10,
+          "description": "Kit components to jig",
+          "setupMin": 0,
+          "cycleMin": 3.9,
+          "labourMin": 3.9,
+          "skillId": "SK-WELD",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 20,
+          "description": "Tack weld in jig",
+          "assetId": "F2-C02-FABT-02",
+          "setupMin": 5,
+          "cycleMin": 2.6,
+          "labourMin": 2.6,
+          "skillId": "SK-FAB",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 30,
+          "description": "Weld sequence A",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 19,
+          "cycleMin": 7.1,
+          "labourMin": 1.8,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-CIR-OS-W",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 40,
+          "description": "Weld sequence B",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 19,
+          "cycleMin": 5.9,
+          "labourMin": 1.3,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-CIR-OS-W",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 50,
+          "description": "Weld sequence C",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 19,
+          "cycleMin": 5.8,
+          "labourMin": 1.4,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-CIR-OS-W",
+          "vaType": "VA"
+        },
+        {
+          "opNo": 60,
+          "description": "Cool-down dwell",
+          "assetId": "F2-C02-RWELD-01",
+          "setupMin": 19,
+          "cycleMin": 10.8,
+          "labourMin": 2.2,
+          "skillId": "SK-WELD",
+          "toolingId": "FX-CIR-OS-W",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 70,
+          "description": "Spatter clean & dress",
+          "setupMin": 0,
+          "cycleMin": 2.9,
+          "labourMin": 2.9,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        },
+        {
+          "opNo": 80,
+          "description": "Visual weld inspection",
+          "setupMin": 0,
+          "cycleMin": 1.8,
+          "labourMin": 1.8,
+          "skillId": "SK-WELD",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 90,
+          "description": "Dimensional check on table",
+          "assetId": "F2-C02-FABT-02",
+          "setupMin": 5,
+          "cycleMin": 5.9,
+          "labourMin": 5.9,
+          "skillId": "SK-FAB",
+          "vaType": "ENVA"
+        },
+        {
+          "opNo": 100,
+          "description": "Move to despatch buffer",
+          "setupMin": 0,
+          "cycleMin": 3.4,
+          "labourMin": 3.4,
+          "skillId": "SK-GEN",
+          "vaType": "NVA"
+        }
+      ]
+    }
+  ],
+  "serviceAllowance": {
+    "electricalKw": 134,
+    "airLpm": 647,
+    "extractionM3h": 10566,
+    "craneTonnes": 3,
+    "coolantLpm": 38
+  }
+}

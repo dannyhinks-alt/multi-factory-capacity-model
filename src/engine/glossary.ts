@@ -1,0 +1,73 @@
+/**
+ * Plain-English, one-sentence hover explanations: what each number means and why it matters.
+ * One source of truth for KPI cards, readiness badges, leaderboard rows and capacity bars.
+ */
+export const GLOSSARY = {
+  totalCapex: 'Money tied up in machines, installation, tooling and shared plant (compressors, substations, cranes) for the active factories — the investment the layout needs.',
+  footprint: 'Floor area the plan needs: cell envelopes plus aisles (circulation) plus stores and buffers — compare it with the building to see if it fits.',
+  storesWip: 'Cash sitting on the floor as raw material, kits, work-in-progress and finished stock — lower means less money waiting.',
+  avgUtilisation: 'How busy the loaded cells are on average against their binding capacity — above 85% leaves little room for disruption.',
+  oee: 'Overall Equipment Effectiveness: the share of planned time machines actually produce good parts at full speed.',
+  teep: 'Total Effective Equipment Performance: OEE spread over every hour of the year, showing how much of the calendar is truly productive.',
+  pce: 'Process Cycle Efficiency: the share of cycle minutes that add value to the part, rather than moving, waiting or checking it.',
+  bottlenecks: 'Cells loaded beyond their binding capacity — they cap how many top Assemblies the network can despatch.',
+  blocked: 'Cells whose design gate is BLOCKED (e.g. missing machine, skill or tooling) — they cannot be relied on until fixed.',
+  activeFactories: 'Plants switched on in the Dictionary — switched-off plants are left out of every KPI, footprint, utility and stores total.',
+  baseline: 'Version and sign-off status of the Live Baseline — only an Approved Baseline should be issued to the business.',
+  storage: 'Where your work is being saved: a linked project file on disk, or only this browser’s storage (back up regularly).',
+  integrity: 'Share of the logic checks (BOM ↔ routes ↔ ops ↔ stores ↔ services) that pass — anything below 100% has broken links to fix.',
+  alignment: 'How closely the working cell routes follow the locked Fixed Process Documents — deviations need justification or correction.',
+  aligned: 'Working op matches the Fixed Process standard within tolerance.',
+  maturing: 'Working op has drifted beyond tolerance but not into non-compliance — usually a process improvement awaiting approval.',
+  compliance: 'Working op breaks the Fixed Process (missing mandatory step, skill or large time gap) — must be corrected or formally approved.',
+  newLocal: 'Op performed in the cell that the Fixed Process does not contain — add it to the next revision or remove it.',
+  dwell: 'Hours a batch spends inside the cell (setup plus every part through every op) plus queueing in its inbound buffer — long dwell ties up cash and lead time.',
+  wip: 'Value of parts waiting at or inside this cell (in-process batch plus inbound buffer stock).',
+  visits: 'Batches per year passing through this cell or work centre — busy junctions are where small delays ripple furthest.',
+  pallets: 'Pallet / stillage moves per year in and out — each one costs handling time and aisle traffic.',
+  corridor: 'Total kilometres per year driven along this route (loaded and empty return, plus road legs between plants) — long corridors are layout and handling cost.',
+  machineCap: 'Units per year the machines can make at their OEE after setups — the limit if labour and tooling were unlimited.',
+  labourCap: 'Units per year the competent operators (skill level 2 or above) can make with normal absence — the limit if machines and tooling were unlimited.',
+  toolingCap: 'Units per year the fixtures / tooling can support within their maximum dwell — the limit if machines and people were unlimited.',
+  demand: 'Units per year the 5-Level BOM and Master Schedule require from this cell, after scrap and dual-source splits.',
+  compression: 'How many raw micro-ops were folded into each simulation Macro-Block — higher means a simpler, faster Plant Simulation model.',
+  sharedWcRisk: 'Shared Work Centre fed by many cells or already busy — random arrivals will queue here, so verify the buffer and flow in Plant Simulation.',
+  spaghetti: 'Internal travel kilometres per year per 1,000 m² of floor — higher means more tangled, criss-crossing material flow.',
+  intraKm: 'Forklift / tugger kilometres per year inside the plants (loaded plus empty return) — less travel means less handling cost and congestion.',
+  crossPallets: 'Pallets per year shipped between plants — every transfer adds trucks, paperwork and lead time.',
+  interPlantKm: 'Road kilometres per year driven between plants using the editable F1–F4 distances.',
+  handling: 'Labour hours per year spent moving material (pick-up, set-down, driving, truck loading) — pure non-value-added cost.',
+  logistics: 'Annual cost of the inter-plant milk-run trucks (runs per week × trucks needed per run × £ per truck) — the price of splitting work across plants.',
+  transit: 'Days a pallet spends on the road between plants — added to buffer cover and to the BOM cumulative lead time whenever a part changes factory.',
+  multiHop: 'Ordered routing steps for one part number travelling through several cells or factories in sequence (e.g. machine, anodise, finish grind).',
+  bottleneckCycle: 'Bottleneck_Cycle_Min sets the steady-state output rate in Plant Simulation (one part leaves every cycle).',
+  leadTime: 'Total_Route_LeadTime_Min is how long a whole transfer batch really takes to get through the cell (setup plus touch plus walk-away time).',
+} as const;
+
+export type GlossaryKey = keyof typeof GLOSSARY;
+
+/** Plain-English fallback explanations for KPI cards, keyed by their visible label. */
+export const STAT_HINTS: Record<string, string> = {
+  'Micro-steps folded': 'Detailed passport operations collapsed into the simulation blocks — the detail Plant Simulation no longer has to model one by one.',
+  'DES macro-operations': 'One simulation block per cell route — the number of stations the Plant Simulation model needs.',
+  'Schedule arrivals': 'Quarterly arrival rows for every Macro-Block — how demand enters the simulation over the year.',
+  AGREE: 'Cells where the simulation’s utilisation is within tolerance of the hub’s static figure — the two models tell the same story.',
+  'Buffer alerts': 'Cells where the simulated queue exceeded the buffer limit — waiting stock the static model cannot see.',
+  'Documents (locked 🔒)': 'Formal Fixed Process Documents held read-only as the engineering reference.',
+  'Process alignment': GLOSSARY.alignment,
+  ALIGNED: GLOSSARY.aligned,
+  'MATURING DRIFT': GLOSSARY.maturing,
+  'COMPLIANCE DEVIATION': GLOSSARY.compliance,
+  'NEW LOCAL STEP': GLOSSARY.newLocal,
+  'Spec step changes': 'Fixed Process steps the incoming revision adds, removes or changes.',
+  'Back into alignment': 'Working ops that the new revision brings back within tolerance.',
+  'Newly deviating': 'Working ops that become drifts or deviations under the new revision — check before locking it.',
+  'Still drifting': 'Working ops that drift under both the current and the incoming revision.',
+  'Impacted cells': 'Cells whose working routes are affected by the revision change.',
+  'ECR reference': 'Identifier of the Engineering Change Request pack compiled from approved drifts.',
+  'Documents to re-issue': 'Fixed Process Documents that move to the next revision when the pack is issued.',
+  'Approved changes': 'Engineering-approved drifts that will be written into the next revision.',
+  'Awaiting decision': 'Drifts still needing an engineering justification and an approve / reject decision.',
+  'Macro-blocks affected': 'Simulation Macro-Blocks whose routes change because of the approved drifts.',
+};
+export const explain = (k: GlossaryKey): string => GLOSSARY[k];

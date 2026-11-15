@@ -1,0 +1,234 @@
+Document ID,Revision,Effective Date,BOM Part ID,Op No,Op Description,Standard Setup Min,Standard Cycle Min,Required Skill Level,Tooling/Fixture Spec,Mandatory Step
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,10,Load unit to rig,0,4.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,20,Connect services,0,3.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,30,Functional run-in,5,20.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,40,Performance test,5,16,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,50,Endurance soak,5,14.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,60,Leak / proof test,5,4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,70,Certificate of conformity,0,3.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100,80,Pack for despatch,0,3.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,10,Kit parts to station,0,6.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,20,Sub-assemble bearings & seals,5,65.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,30,Fit main components,5,50.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,40,Fit fasteners,5,56.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,50,Torque critical joints,5,13.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,60,Witness mark & record,0,3.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,70,Leak test,5,11,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,80,Final visual & label,0,5.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM,90,Transfer to test,0,2.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,10,Kit components to jig,0,2.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,20,Tack weld in jig,4.25,6.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,30,Weld sequence A,17,7.7,2,FX-ATL-100-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,40,Weld sequence B,17,5.2,2,FX-ATL-100-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,50,Flip & re-clamp,17,11.1,2,FX-ATL-100-DM-W,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,60,Weld sequence C,17,7.9,2,FX-ATL-100-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,70,Cool-down dwell,17,7.9,2,FX-ATL-100-DM-W,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,80,Spatter clean & dress,0,4.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,90,Visual weld inspection,0,3.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,100,Dimensional check on table,4.25,6.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W,110,Move to despatch buffer,0,5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,10,Kit & stage material,0,1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,20,Load & clamp in fixture,0,1.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,30,OP10 Rough machine datum faces,57,1.5,2,FX-ATL-100-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,40,OP20 Semi-finish profile,57,1.2,2,FX-ATL-100-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,50,OP30 Finish machine bores,57,2.58,2,FX-ATL-100-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,60,OP40 Drill & tap,57,3.47,2,FX-ATL-100-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,70,Tool change & offset check,57,2.9,2,FX-ATL-100-DM-W-01,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,80,Unload & blow-off,0,2.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,90,Manual deburr,5,3.47,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,100,Aqueous wash,5,3.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,110,CMM first-off / sample inspection,5,2.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,120,Visual inspection & paperwork,0,1.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,130,"Mark, bag & tag",0,1.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-01,140,Move to despatch buffer,0,1.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,10,Kit & stage material,0,1.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,20,Load & clamp in fixture,0,1.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,30,OP10 Rough machine datum faces,39,5.4,2,FX-ATL-100-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,40,OP20 Semi-finish profile,39,3.7,2,FX-ATL-100-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,50,OP30 Finish machine bores,39,3.8,2,FX-ATL-100-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,60,OP40 Drill & tap,39,3.1,2,FX-ATL-100-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,70,Tool change & offset check,39,5.3,2,FX-ATL-100-DM-W-02,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,80,Unload & blow-off,0,2.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,90,Manual deburr,5,5.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,100,CMM first-off / sample inspection,5,3.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,110,Visual inspection & paperwork,0,1.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-W-02,130,Move to despatch buffer,0,2.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,10,Receive & jig hang,0,2.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,20,Mask features,0,3.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,30,Primary process,25,25.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,40,Second coat / pass,25,26.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,50,De-mask,0,5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,60,DFT & adhesion check,0,1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C,70,Pack & despatch to F4,0,3.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,10,Kit & stage material,0,5.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,20,Load & clamp in fixture,0,3.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,30,OP10 Rough machine datum faces,29,13.6,2,FX-ATL-100-DM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,40,OP20 Semi-finish profile,29,11.5,2,FX-ATL-100-DM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,50,OP30 Finish machine bores,29,16.8,2,FX-ATL-100-DM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,60,OP40 Drill & tap,29,16.5,2,FX-ATL-100-DM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,70,Unload & blow-off,0,2.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,80,Manual deburr,5,6.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,90,CMM first-off / sample inspection,5,2.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,95,Magnetic particle crack detection (MPI),5,4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,100,Visual inspection & paperwork,0,3.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-01,110,Move to despatch buffer,0,2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,10,Kit & stage material,0,2.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,20,Load & clamp in fixture,0,2.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,30,OP10 Rough machine datum faces,31,4.3,2,FX-ATL-100-DM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,40,OP20 Semi-finish profile,31,8.9,2,FX-ATL-100-DM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,50,OP30 Finish machine bores,31,8.8,2,FX-ATL-100-DM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,60,Unload & blow-off,0,3.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,70,Manual deburr,5,4.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,75,Interim visual check,0,1.5,1,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,80,CMM first-off / sample inspection,5,4.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,90,Visual inspection & paperwork,0,2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,100,"Mark, bag & tag",0,2.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-100-DM-C-02,110,Move to despatch buffer,0,2.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,10,Kit parts to station,0,3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,20,Sub-assemble bearings & seals,5,61,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,30,Fit main components,5,26.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,40,Fit fasteners,5,54.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,50,Torque critical joints,5,6.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,60,Witness mark & record,0,5.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,70,Leak test,5,9.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,80,Final visual & label,0,4.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM,90,Transfer to test,0,2.3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,10,Kit components to jig,0,2.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,20,Tack weld in jig,5,8.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,30,Weld sequence A,16,11.1,2,FX-ATL-HM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,40,Weld sequence B,16,9.7,2,FX-ATL-HM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,50,Flip & re-clamp,16,8.4,2,FX-ATL-HM-W,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,60,Cool-down dwell,16,12.3,2,FX-ATL-HM-W,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,70,Spatter clean & dress,0,2.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,80,Visual weld inspection,0,4.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,90,Dimensional check on table,5,4.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W,100,Move to despatch buffer,0,1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,10,Kit & stage material,0,1.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,20,Load & clamp in fixture,0,1.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,30,OP10 Rough machine datum faces,28,9.1,2,FX-ATL-HM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,40,OP20 Semi-finish profile,28,8.4,2,FX-ATL-HM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,50,In-process probing,28,15.1,2,FX-ATL-HM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,60,OP30 Finish machine bores,28,11.2,2,FX-ATL-HM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,70,Unload & blow-off,0,3.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,80,Manual deburr,5,3.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,90,CMM first-off / sample inspection,5,4.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,100,Visual inspection & paperwork,0,4.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,110,"Mark, bag & tag",0,3.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,120,Move to despatch buffer,0,4.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,210,Receive & rack parts from F1,0,0.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,220,Degrease,5,0.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,230,Hard anodise bath,20,0.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,240,Seal,0,0.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,250,Unrack & inspect coating,0,0.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,260,Pack & despatch back to F1,0,0.3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,310,Load & clamp anodised part,0,0.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,320,Finish grind bearing diameters,30,3.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,330,CMM final inspection,5,1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,340,Move to despatch buffer,0,0.3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,10,Retrieve sheet / section,0,1.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,20,Profile / form,22,30,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,30,Edge deburr / dress,5,8.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,40,Dimensional check,0,1.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,50,Stillage & move to buffer,0,1.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,10,Receive & jig hang,0,1.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,20,Pre-treatment wash,5,10,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,30,Mask features,0,1.9,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,40,Primary process,21,32.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,50,De-mask,0,1.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,60,DFT & adhesion check,0,1.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C,70,Pack & despatch to F4,0,2.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,10,Kit & stage material,0,1.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,20,Load & clamp in fixture,0,3.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,30,OP10 Rough machine datum faces,36,9.3,2,FX-ATL-HM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,40,OP20 Semi-finish profile,36,7.9,2,FX-ATL-HM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,50,OP30 Finish machine bores,36,7.2,2,FX-ATL-HM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,60,OP40 Drill & tap,36,5.8,2,FX-ATL-HM-C-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,70,Tool change & offset check,36,9.6,2,FX-ATL-HM-C-01,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,80,Unload & blow-off,0,2.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,90,Manual deburr,5,4.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,100,Aqueous wash,5,4.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,110,CMM first-off / sample inspection,5,3.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,120,Visual inspection & paperwork,0,4.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,130,"Mark, bag & tag",0,4.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-01,140,Move to despatch buffer,0,2.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,10,Kit & stage material,0,1.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,20,Load & clamp in fixture,0,1.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,30,OP10 Rough machine datum faces,37,5,2,FX-ATL-HM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,40,OP20 Semi-finish profile,37,2.7,2,FX-ATL-HM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,50,In-process probing,37,3.5,2,FX-ATL-HM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,60,OP30 Finish machine bores,37,3.5,2,FX-ATL-HM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,70,OP40 Drill & tap,37,3.4,2,FX-ATL-HM-C-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,80,Unload & blow-off,0,1.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,90,Manual deburr,5,2.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,100,CMM first-off / sample inspection,5,3.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,110,Visual inspection & paperwork,0,1.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,120,"Mark, bag & tag",0,1.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-C-02,130,Move to despatch buffer,0,1.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,10,Load unit to rig,0,2.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,20,Connect services,0,1.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,30,Functional run-in,5,66.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,40,Performance test,5,65.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,50,Endurance soak,5,61.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,60,Leak / proof test,5,15.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,70,Certificate of conformity,0,6.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200,80,Pack for despatch,0,3.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,10,Kit parts to station,0,4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,20,Sub-assemble bearings & seals,5,162.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,30,Fit main components,5,239.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,40,Torque critical joints,5,44.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,50,Witness mark & record,0,6.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,60,Final visual & label,0,4.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM,70,Transfer to test,0,2.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,10,Kit components to jig,0,5.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,20,Tack weld in jig,5,18.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,30,Weld sequence A,18,28.5,2,FX-ATL-200-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,40,Weld sequence B,18,18.4,2,FX-ATL-200-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,50,Weld sequence C,18,15.1,2,FX-ATL-200-DM-W,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,60,Spatter clean & dress,0,2.3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,70,Visual weld inspection,0,3.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,80,Dimensional check on table,5,22.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W,90,Move to despatch buffer,0,1.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,10,Kit & stage material,0,4.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,20,Load & clamp in fixture,0,5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,30,OP10 Rough machine datum faces,42,6.9,2,FX-ATL-200-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,40,OP20 Semi-finish profile,42,11,2,FX-ATL-200-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,50,In-process probing,42,12.9,2,FX-ATL-200-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,60,OP30 Finish machine bores,42,11.9,2,FX-ATL-200-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,70,OP40 Drill & tap,42,8.1,2,FX-ATL-200-DM-W-01,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,80,Unload & blow-off,0,1.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,90,Manual deburr,5,6.8,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,100,CMM first-off / sample inspection,5,8.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,110,Visual inspection & paperwork,0,5.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,120,"Mark, bag & tag",0,3.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-01,130,Move to despatch buffer,0,3.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,10,Kit & stage material,0,3.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,20,Load & clamp in fixture,0,1.5,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,30,OP10 Rough machine datum faces,36,14.3,2,FX-ATL-200-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,40,OP20 Semi-finish profile,36,10.6,2,FX-ATL-200-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,50,In-process probing,36,25.5,2,FX-ATL-200-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,60,OP30 Finish machine bores,36,10,2,FX-ATL-200-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,70,OP40 Drill & tap,36,22.1,2,FX-ATL-200-DM-W-02,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,80,Unload & blow-off,0,4.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,90,Manual deburr,5,9.1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,100,CMM first-off / sample inspection,5,4.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,110,Visual inspection & paperwork,0,5.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,120,"Mark, bag & tag",0,4.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-W-02,130,Move to despatch buffer,0,1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,10,Receive & jig hang,0,6.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,20,Mask features,0,4.2,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,30,Primary process,26,227.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,40,De-mask,0,6.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,50,DFT & adhesion check,0,1.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C,60,Pack & despatch to F4,0,1.7,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,10,Receive & rack parts,0,4.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,20,Degrease,5,17.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,30,Etch / pickle,17,35.7,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,40,Primary bath,17,30.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,50,Bath titration check,0,2.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,60,Unrack & inspect,0,2.5,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-01,70,Pack & despatch to F4,0,4.8,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-02,10,Retrieve sheet / section,0,1.9,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-02,20,Profile / form,30,36.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-02,30,Edge deburr / dress,5,11.6,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-02,40,Dimensional check,0,2.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-200-DM-C-02,50,Stillage & move to buffer,0,2.8,2,,N

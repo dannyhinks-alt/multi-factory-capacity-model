@@ -1,0 +1,120 @@
+Asset ID,Description,Factory,Cell ID,Category,Complexity Class,Shift Tier,Footprint m²,OEE %,CapEx Cost £,Install Cost £,Electrical kW,Compressed Air L/min,Extraction m³/hr,Crane Tonnes,Coolant/Water
+CELL-A-VMC5-01,5-Axis Machining Centre ×2,F1,CELL-A,5-Axis Machining Centre,B,2,28,80,438000,35000,45,400,0,1,60
+CELL-A-CMM-02,Co-ordinate Measuring Machine,F1,CELL-A,Co-ordinate Measuring Machine,B,2,12,91,166000,10000,5,100,0,0,0
+CELL-A-DEBURR-03,Deburr Bench (LEV),F1,CELL-A,Deburr Bench (LEV),E,2,6,88,12000,1500,2,300,1200,0,0
+CELL-A-WASH-04,Aqueous Parts Washer,F1,CELL-A,Aqueous Parts Washer,E,2,10,91,61000,8000,18,50,800,0,30
+CELL-B-VMC5-01,5-Axis Machining Centre ×2,F1,CELL-B,5-Axis Machining Centre,B,2,28,77,403000,35000,45,400,0,1,60
+CELL-B-CMM-02,Co-ordinate Measuring Machine,F1,CELL-B,Co-ordinate Measuring Machine,B,2,12,90,148000,10000,5,100,0,0,0
+CELL-B-DEBURR-03,Deburr Bench (LEV),F1,CELL-B,Deburr Bench (LEV),E,2,6,87,12000,1500,2,300,1200,0,0
+CELL-B-WASH-04,Aqueous Parts Washer,F1,CELL-B,Aqueous Parts Washer,E,2,10,91,64000,8000,18,50,800,0,30
+CELL-C-VMC5-01,5-Axis Machining Centre ×3,F1,CELL-C,5-Axis Machining Centre,B,2,28,80,430000,35000,45,400,0,1,60
+CELL-C-CMM-02,Co-ordinate Measuring Machine,F1,CELL-C,Co-ordinate Measuring Machine,B,2,12,88,153000,10000,5,100,0,0,0
+CELL-C-DEBURR-03,Deburr Bench (LEV),F1,CELL-C,Deburr Bench (LEV),E,2,6,89,13000,1500,2,300,1200,0,0
+CELL-D-VMC5-01,5-Axis Machining Centre ×2,F1,CELL-D,5-Axis Machining Centre,B,2,28,79,405000,35000,45,400,0,1,60
+CELL-D-CMM-02,Co-ordinate Measuring Machine,F1,CELL-D,Co-ordinate Measuring Machine,B,2,12,93,168000,10000,5,100,0,0,0
+CELL-D-DEBURR-03,Deburr Bench (LEV),F1,CELL-D,Deburr Bench (LEV),E,2,6,91,11000,1500,2,300,1200,0,0
+CELL-D-WASH-04,Aqueous Parts Washer,F1,CELL-D,Aqueous Parts Washer,E,2,10,95,61000,8000,18,50,800,0,30
+CELL-E-VMC3-01,3-Axis Machining Centre ×2,F1,CELL-E,3-Axis Machining Centre,C,2,18,83,186000,15000,25,250,0,0.5,40
+CELL-E-CMM-02,Co-ordinate Measuring Machine,F1,CELL-E,Co-ordinate Measuring Machine,B,2,12,90,157000,10000,5,100,0,0,0
+CELL-E-DEBURR-03,Deburr Bench (LEV),F1,CELL-E,Deburr Bench (LEV),E,2,6,89,13000,1500,2,300,1200,0,0
+CELL-F-VMC3-01,3-Axis Machining Centre ×3,F1,CELL-F,3-Axis Machining Centre,C,2,18,82,170000,15000,25,250,0,0.5,40
+CELL-F-CMM-02,Co-ordinate Measuring Machine,F1,CELL-F,Co-ordinate Measuring Machine,B,2,12,91,172000,10000,5,100,0,0,0
+CELL-F-DEBURR-03,Deburr Bench (LEV),F1,CELL-F,Deburr Bench (LEV),E,2,6,91,12000,1500,2,300,1200,0,0
+CELL-F-WASH-04,Aqueous Parts Washer,F1,CELL-F,Aqueous Parts Washer,E,2,10,93,62000,8000,18,50,800,0,30
+CELL-G-VMC3-01,3-Axis Machining Centre ×2,F1,CELL-G,3-Axis Machining Centre,C,2,18,85,192000,15000,25,250,0,0.5,40
+CELL-G-CMM-02,Co-ordinate Measuring Machine,F1,CELL-G,Co-ordinate Measuring Machine,B,2,12,91,149000,10000,5,100,0,0,0
+CELL-G-DEBURR-03,Deburr Bench (LEV),F1,CELL-G,Deburr Bench (LEV),E,2,6,90,11000,1500,2,300,1200,0,0
+CELL-H-VMC3-01,3-Axis Machining Centre ×2,F1,CELL-H,3-Axis Machining Centre,C,2,18,80,186000,15000,25,250,0,0.5,40
+CELL-H-CMM-02,Co-ordinate Measuring Machine,F1,CELL-H,Co-ordinate Measuring Machine,B,2,12,89,173000,10000,5,100,0,0,0
+CELL-H-DEBURR-03,Deburr Bench (LEV),F1,CELL-H,Deburr Bench (LEV),E,2,6,88,11000,1500,2,300,1200,0,0
+CELL-H-WASH-04,Aqueous Parts Washer,F1,CELL-H,Aqueous Parts Washer,E,2,10,94,61000,8000,18,50,800,0,30
+CELL-I-LATHE-01,CNC Turning Centre ×3,F1,CELL-I,CNC Turning Centre,C,2,14,85,217000,15000,30,200,0,0.5,40
+CELL-I-CMM-02,Co-ordinate Measuring Machine,F1,CELL-I,Co-ordinate Measuring Machine,B,2,12,89,175000,10000,5,100,0,0,0
+CELL-I-DEBURR-03,Deburr Bench (LEV),F1,CELL-I,Deburr Bench (LEV),E,2,6,88,11000,1500,2,300,1200,0,0
+CELL-J-LATHE-01,CNC Turning Centre ×2,F1,CELL-J,CNC Turning Centre,C,2,14,86,221000,15000,30,200,0,0.5,40
+CELL-J-CMM-02,Co-ordinate Measuring Machine,F1,CELL-J,Co-ordinate Measuring Machine,B,2,12,88,152000,10000,5,100,0,0,0
+CELL-J-DEBURR-03,Deburr Bench (LEV),F1,CELL-J,Deburr Bench (LEV),E,2,6,91,12000,1500,2,300,1200,0,0
+CELL-J-WASH-04,Aqueous Parts Washer,F1,CELL-J,Aqueous Parts Washer,E,2,10,93,65000,8000,18,50,800,0,30
+CELL-K-GRIND-01,CNC Cylindrical Grinder ×2,F1,CELL-K,CNC Cylindrical Grinder,A,3,16,75,324000,25000,22,150,600,0.5,80
+CELL-K-CMM-02,Co-ordinate Measuring Machine,F1,CELL-K,Co-ordinate Measuring Machine,B,3,12,93,167000,10000,5,100,0,0,0
+CELL-K-DEBURR-03,Deburr Bench (LEV),F1,CELL-K,Deburr Bench (LEV),E,3,6,89,11000,1500,2,300,1200,0,0
+CELL-L-GRIND-01,CNC Cylindrical Grinder ×3,F1,CELL-L,CNC Cylindrical Grinder,A,2,16,75,376000,25000,22,150,600,0.5,80
+CELL-L-CMM-02,Co-ordinate Measuring Machine,F1,CELL-L,Co-ordinate Measuring Machine,B,2,12,91,168000,10000,5,100,0,0,0
+CELL-L-DEBURR-03,Deburr Bench (LEV),F1,CELL-L,Deburr Bench (LEV),E,2,6,89,12000,1500,2,300,1200,0,0
+CELL-L-WASH-04,Aqueous Parts Washer,F1,CELL-L,Aqueous Parts Washer,E,2,10,94,61000,8000,18,50,800,0,30
+F2-C01-RWELD-01,Robotic Weld Cell ×2,F2,F2-C01,Robotic Weld Cell,B,2,35,76,306000,30000,55,200,4000,3,15
+F2-C01-FABT-02,Fabrication Table & Jig,F2,F2-C01,Fabrication Table & Jig,D,2,12,82,14000,2000,3,150,500,2,0
+F2-C02-RWELD-01,Robotic Weld Cell ×2,F2,F2-C02,Robotic Weld Cell,B,2,35,74,308000,30000,55,200,4000,3,15
+F2-C02-FABT-02,Fabrication Table & Jig,F2,F2-C02,Fabrication Table & Jig,D,2,12,87,15000,2000,3,150,500,2,0
+F2-C03-RWELD-01,Robotic Weld Cell,F2,F2-C03,Robotic Weld Cell,B,2,35,77,285000,30000,55,200,4000,3,15
+F2-C03-FABT-02,Fabrication Table & Jig,F2,F2-C03,Fabrication Table & Jig,D,2,12,84,14000,2000,3,150,500,2,0
+F2-C04-MWELD-01,Manual Weld Bay ×3,F2,F2-C04,Manual Weld Bay,D,2,16,71,23000,5000,20,100,2500,1,0
+F2-C04-FABT-02,Fabrication Table & Jig ×2,F2,F2-C04,Fabrication Table & Jig,D,2,12,83,14000,2000,3,150,500,2,0
+F2-C05-MWELD-01,Manual Weld Bay ×3,F2,F2-C05,Manual Weld Bay,D,2,16,73,25000,5000,20,100,2500,1,0
+F2-C05-FABT-02,Fabrication Table & Jig ×2,F2,F2-C05,Fabrication Table & Jig,D,2,12,85,14000,2000,3,150,500,2,0
+F2-C06-MWELD-01,Manual Weld Bay ×2,F2,F2-C06,Manual Weld Bay,D,2,16,70,23000,5000,20,100,2500,1,0
+F2-C06-FABT-02,Fabrication Table & Jig,F2,F2-C06,Fabrication Table & Jig,D,2,12,83,14000,2000,3,150,500,2,0
+F2-C07-LASER-01,Fibre Laser Cutter,F2,F2-C07,Fibre Laser Cutter,B,2,40,81,382000,30000,60,600,3000,0,20
+F2-C07-DEBURR-02,Deburr Bench (LEV),F2,F2-C07,Deburr Bench (LEV),E,2,6,86,11000,1500,2,300,1200,0,0
+F2-C08-LASER-01,Fibre Laser Cutter,F2,F2-C08,Fibre Laser Cutter,B,2,40,82,377000,30000,60,600,3000,0,20
+F2-C08-DEBURR-02,Deburr Bench (LEV),F2,F2-C08,Deburr Bench (LEV),E,2,6,87,13000,1500,2,300,1200,0,0
+F2-C09-BRAKE-01,CNC Press Brake ×2,F2,F2-C09,CNC Press Brake,C,2,20,82,151000,12000,22,0,0,2,0
+F2-C09-FABT-02,Fabrication Table & Jig,F2,F2-C09,Fabrication Table & Jig,D,2,12,87,16000,2000,3,150,500,2,0
+F2-C10-BRAKE-01,CNC Press Brake,F2,F2-C10,CNC Press Brake,C,2,20,80,139000,12000,22,0,0,2,0
+F2-C11-FABT-01,Fabrication Table & Jig ×3,F2,F2-C11,Fabrication Table & Jig,D,2,12,88,16000,2000,3,150,500,2,0
+F2-C11-MWELD-02,Manual Weld Bay,F2,F2-C11,Manual Weld Bay,D,2,16,68,26000,5000,20,100,2500,1,0
+F2-C12-FABT-01,Fabrication Table & Jig ×2,F2,F2-C12,Fabrication Table & Jig,D,2,12,87,14000,2000,3,150,500,2,0
+F2-C12-MWELD-02,Manual Weld Bay ×2,F2,F2-C12,Manual Weld Bay,D,2,16,69,24000,5000,20,100,2500,1,0
+F3-C01-SHOT-01,Shot Blast Cabinet,F3,F3-C01,Shot Blast Cabinet,D,2,22,78,111000,15000,30,2500,6000,1,0
+F3-C01-WASH-02,Aqueous Parts Washer,F3,F3-C01,Aqueous Parts Washer,E,2,10,90,69000,8000,18,50,800,0,30
+F3-C02-SHOT-01,Shot Blast Cabinet,F3,F3-C02,Shot Blast Cabinet,D,2,22,79,118000,15000,30,2500,6000,1,0
+F3-C02-WASH-02,Aqueous Parts Washer,F3,F3-C02,Aqueous Parts Washer,E,2,10,93,59000,8000,18,50,800,0,30
+F3-C03-PAINT-01,Spray Paint Booth ×2,F3,F3-C03,Spray Paint Booth,C,2,60,75,263000,40000,40,1500,20000,2,0
+F3-C03-OVEN-02,Curing Oven,F3,F3-C03,Curing Oven,D,2,45,87,197000,25000,120,0,3000,2,0
+F3-C04-PAINT-01,Spray Paint Booth,F3,F3-C04,Spray Paint Booth,C,3,60,69,260000,40000,40,1500,20000,2,0
+F3-C04-OVEN-02,Curing Oven,F3,F3-C04,Curing Oven,D,3,45,83,195000,25000,120,0,3000,2,0
+F3-C05-PAINT-01,Spray Paint Booth,F3,F3-C05,Spray Paint Booth,C,2,60,70,250000,40000,40,1500,20000,2,0
+F3-C05-OVEN-02,Curing Oven,F3,F3-C05,Curing Oven,D,2,45,82,177000,25000,120,0,3000,2,0
+F3-C06-ANOD-01,Anodise Tank Line,F3,F3-C06,Anodise Tank Line,B,2,80,80,533000,60000,150,300,12000,2,200
+F3-C06-WASH-02,Aqueous Parts Washer,F3,F3-C06,Aqueous Parts Washer,E,2,10,90,61000,8000,18,50,800,0,30
+F3-C07-PASS-01,Passivation Tank Line,F3,F3-C07,Passivation Tank Line,C,2,50,82,284000,30000,60,200,6000,1,120
+F3-C07-WASH-02,Aqueous Parts Washer,F3,F3-C07,Aqueous Parts Washer,E,2,10,95,61000,8000,18,50,800,0,30
+F3-C08-PAINT-01,Spray Paint Booth,F3,F3-C08,Spray Paint Booth,C,2,60,72,262000,40000,40,1500,20000,2,0
+F3-C08-OVEN-02,Curing Oven,F3,F3-C08,Curing Oven,D,2,45,82,164000,25000,120,0,3000,2,0
+F3-C09-ANOD-01,Anodise Tank Line,F3,F3-C09,Anodise Tank Line,B,2,80,76,571000,60000,150,300,12000,2,200
+F3-C09-WASH-02,Aqueous Parts Washer,F3,F3-C09,Aqueous Parts Washer,E,2,10,95,65000,8000,18,50,800,0,30
+F3-C10-PASS-01,Passivation Tank Line,F3,F3-C10,Passivation Tank Line,C,2,50,81,257000,30000,60,200,6000,1,120
+F3-C10-WASH-02,Aqueous Parts Washer,F3,F3-C10,Aqueous Parts Washer,E,2,10,92,61000,8000,18,50,800,0,30
+F3-C11-PAINT-01,Spray Paint Booth,F3,F3-C11,Spray Paint Booth,C,2,60,72,249000,40000,40,1500,20000,2,0
+F4-C01-ASSY-01,Assembly Station ×3,F4,F4-C01,Assembly Station,D,2,12,85,20000,2000,3,200,0,0.5,0
+F4-C01-TORQ-02,DC Torque Station,F4,F4-C01,DC Torque Station,C,2,6,90,46000,3000,2,100,0,0,0
+F4-C01-LEAK-03,Leak Test Station,F4,F4-C01,Leak Test Station,B,2,8,92,67000,5000,4,300,0,0,0
+F4-C02-ASSY-01,Assembly Station ×3,F4,F4-C02,Assembly Station,D,2,12,87,17000,2000,3,200,0,0.5,0
+F4-C02-TORQ-02,DC Torque Station,F4,F4-C02,DC Torque Station,C,2,6,91,49000,3000,2,100,0,0,0
+F4-C02-LEAK-03,Leak Test Station,F4,F4-C02,Leak Test Station,B,2,8,92,76000,5000,4,300,0,0,0
+F4-C03-ASSY-01,Assembly Station ×3,F4,F4-C03,Assembly Station,D,2,12,88,20000,2000,3,200,0,0.5,0
+F4-C03-TORQ-02,DC Torque Station,F4,F4-C03,DC Torque Station,C,2,6,91,42000,3000,2,100,0,0,0
+F4-C03-LEAK-03,Leak Test Station,F4,F4-C03,Leak Test Station,B,2,8,91,72000,5000,4,300,0,0,0
+F4-C04-ASSY-01,Assembly Station ×3,F4,F4-C04,Assembly Station,D,2,12,87,18000,2000,3,200,0,0.5,0
+F4-C04-TORQ-02,DC Torque Station,F4,F4-C04,DC Torque Station,C,2,6,88,41000,3000,2,100,0,0,0
+F4-C04-LEAK-03,Leak Test Station,F4,F4-C04,Leak Test Station,B,2,8,88,64000,5000,4,300,0,0,0
+F4-C05-ASSY-01,Assembly Station ×3,F4,F4-C05,Assembly Station,D,2,12,90,18000,2000,3,200,0,0.5,0
+F4-C05-TORQ-02,DC Torque Station,F4,F4-C05,DC Torque Station,C,2,6,91,48000,3000,2,100,0,0,0
+F4-C05-LEAK-03,Leak Test Station,F4,F4-C05,Leak Test Station,B,2,8,87,73000,5000,4,300,0,0,0
+F4-C06-ASSY-01,Assembly Station ×3,F4,F4-C06,Assembly Station,D,2,12,90,17000,2000,3,200,0,0.5,0
+F4-C06-TORQ-02,DC Torque Station,F4,F4-C06,DC Torque Station,C,2,6,93,43000,3000,2,100,0,0,0
+F4-C06-LEAK-03,Leak Test Station,F4,F4-C06,Leak Test Station,B,2,8,92,65000,5000,4,300,0,0,0
+F4-C07-ASSY-01,Assembly Station ×3,F4,F4-C07,Assembly Station,D,2,12,87,18000,2000,3,200,0,0.5,0
+F4-C07-TORQ-02,DC Torque Station,F4,F4-C07,DC Torque Station,C,2,6,91,49000,3000,2,100,0,0,0
+F4-C07-LEAK-03,Leak Test Station,F4,F4-C07,Leak Test Station,B,2,8,90,75000,5000,4,300,0,0,0
+F4-C08-ASSY-01,Assembly Station ×3,F4,F4-C08,Assembly Station,D,2,12,90,19000,2000,3,200,0,0.5,0
+F4-C08-TORQ-02,DC Torque Station,F4,F4-C08,DC Torque Station,C,2,6,92,41000,3000,2,100,0,0,0
+F4-C08-LEAK-03,Leak Test Station,F4,F4-C08,Leak Test Station,B,2,8,92,76000,5000,4,300,0,0,0
+F4-C09-TEST-01,End-of-Line Test Rig ×2,F4,F4-C09,End-of-Line Test Rig,A,2,20,86,249000,20000,35,400,0,1,40
+F4-C09-LEAK-02,Leak Test Station,F4,F4-C09,Leak Test Station,B,2,8,88,71000,5000,4,300,0,0,0
+F4-C10-TEST-01,End-of-Line Test Rig ×2,F4,F4-C10,End-of-Line Test Rig,A,2,20,88,281000,20000,35,400,0,1,40
+F4-C10-LEAK-02,Leak Test Station,F4,F4-C10,Leak Test Station,B,2,8,88,69000,5000,4,300,0,0,0
+F4-C11-TEST-01,End-of-Line Test Rig ×2,F4,F4-C11,End-of-Line Test Rig,A,2,20,83,283000,20000,35,400,0,1,40
+F4-C11-LEAK-02,Leak Test Station,F4,F4-C11,Leak Test Station,B,2,8,89,74000,5000,4,300,0,0,0
+F4-C12-TEST-01,End-of-Line Test Rig ×2,F4,F4-C12,End-of-Line Test Rig,A,2,20,87,272000,20000,35,400,0,1,40
+F4-C12-LEAK-02,Leak Test Station,F4,F4-C12,Leak Test Station,B,2,8,92,69000,5000,4,300,0,0,0
