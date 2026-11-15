@@ -30,6 +30,36 @@ export function knownIds(state: HubState, domain: AliasDomain): string[] {
   return state.fixtures.map((f) => f.toolingId);
 }
 
+/**
+ * Flagged unrecognised / unmatched IDs per domain (candidates for the Alias Dictionary's “Incoming
+ * Nickname” combo-box): references used somewhere in the hub that are not a canonical ID and not already
+ * aliased — e.g. passport assets missing from the Master catalogue, mappings to unknown cells.
+ */
+export function unrecognisedIds(state: HubState, domain: AliasDomain): string[] {
+  const known = new Set(knownIds(state, domain));
+  const aliased = new Set((state.aliases ?? []).filter((a) => a.domain === domain).map((a) => a.alias));
+  const seen: string[] = [];
+  const add = (id: string | undefined) => {
+    if (id && !known.has(id) && !aliased.has(id)) seen.push(id);
+  };
+  if (domain === 'cell') {
+    state.mappings.forEach((m) => add(m.cellId));
+    state.desResults.forEach((d) => add(d.cellId));
+    state.assets.forEach((a) => add(a.cellId));
+    (state.sharedWorkCentres ?? []).forEach(add);
+  } else if (domain === 'part') {
+    state.mappings.forEach((m) => add(m.bomPartId));
+    state.schedule.forEach((x) => add(x.partId));
+    (state.fixedProcess?.steps ?? []).forEach((x) => add(x.bomPartId));
+  } else if (domain === 'asset') {
+    state.passports.forEach((p) => p.assets.forEach((a) => add(a.assetId)));
+    state.fixtures.forEach((f) => add(f.linkedAsset));
+  } else {
+    state.passports.forEach((p) => p.fixtures.forEach((f) => add(f.toolingId)));
+  }
+  return [...new Set(seen)].sort();
+}
+
 /** Look up an alias (case / punctuation-insensitive). */
 export function resolveAlias(aliases: AliasEntry[] | undefined, domain: AliasDomain, id: string): string | undefined {
   const k = normaliseId(id);

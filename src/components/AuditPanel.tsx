@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FactoryId } from '../engine/types';
 import { useHub } from '../store/HubContext';
-import { Badge, Card, fmtNum, statusTone, td, tdNum, th } from './ui';
+import { explain } from '../engine/glossary';
+import { Badge, Card, Hint, fmtNum, statusTone, td, tdNum, th } from './ui';
 
 /**
  * Background Ingestion & Granularity Audit — live reconciliation of cells per factory,
@@ -11,7 +12,7 @@ export function AuditPanel({ scope = 'All', compact = false, onCell }: { scope?:
   const { model, state } = useHub();
   const a = model.audit;
   const [tab, setTab] = useState<'bom' | 'routes' | 'gates'>('bom');
-  const rows = a.perFactory.filter((f) => scope === 'All' || f.factory === scope);
+  const rows = a.perFactory.filter((f) => (scope === 'All' ? f.active : f.factory === scope));
   const tot = rows.reduce(
     (s, f) => ({ cells: s.cells + f.cells, ops: s.ops + f.rawMicroOps, blocks: s.blocks + f.macroBlocks, blocked: s.blocked + f.gateBlocked, cond: s.cond + f.gateConditional, bn: s.bn + f.bottlenecks }),
     { cells: 0, ops: 0, blocks: 0, blocked: 0, cond: 0, bn: 0 },
@@ -24,6 +25,14 @@ export function AuditPanel({ scope = 'All', compact = false, onCell }: { scope?:
       subtitle={`Background reconciliation · last ingest: ${state.ingestLog[0] ? new Date(state.ingestLog[0].at).toLocaleString('en-GB') : '—'}`}
       actions={<Badge tone={a.unmappedBomNodes.length || unmappedRoutes.length || a.staleMappings.length ? 'warning' : 'good'}>{a.mappedParts}/{a.makeParts} Make parts mapped</Badge>}
     >
+      <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Micro-to-Macro compression by factory">
+        <span className="text-[11px] font-medium text-slate-600">Micro → Macro compression<Hint text={explain('compression')} /></span>
+        {rows.map((f) => (
+          <span key={f.factory} title={`${f.factory}: ${fmtNum(f.rawMicroOps)} raw micro-ops folded into ${f.macroBlocks} Macro-Blocks — ${explain('compression')}`} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-900">
+            {f.factory} <span className="tabular-nums">{f.compressionRatio ? `${f.compressionRatio.toFixed(1)} : 1` : '—'}</span>
+          </span>
+        ))}
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -45,7 +54,7 @@ export function AuditPanel({ scope = 'All', compact = false, onCell }: { scope?:
                 <td className={tdNum}>{f.cells}</td>
                 <td className={tdNum}>{fmtNum(f.rawMicroOps)}</td>
                 <td className={tdNum}>{f.macroBlocks}</td>
-                <td className={tdNum}>{f.macroBlocks ? `${(f.rawMicroOps / f.macroBlocks).toFixed(1)} : 1` : '—'}</td>
+                <td className={tdNum}>{f.macroBlocks ? `${f.compressionRatio.toFixed(1)} : 1` : '—'}</td>
                 <td className={tdNum}>{f.bottlenecks}</td>
                 <td className={tdNum}>{f.gateBlocked}</td>
                 <td className={tdNum}>{f.gateConditional}</td>

@@ -3,7 +3,8 @@ import { buildSeedState } from '../data/seed';
 import { computeModel, type HubModel } from '../engine/model';
 import type { AuditAction, HubState, SignOffStatus } from '../engine/types';
 import { carryGovernance, governanceOf, markEdited, recordAudit, signOff } from '../engine/governance';
-import { deleteScenarioStore, listSnapshots, loadScenarios, loadState, migrateState, pushSnapshot, saveScenario, saveState, type Snapshot } from './persistence';
+import { backupJson, deleteScenarioStore, listSnapshots, loadFileHandle, loadScenarios, loadState, migrateState, parseBackup, pushSnapshot, saveFileHandle, saveScenario, saveState, type Snapshot } from './persistence';
+import { AUTOSAVE_DEBOUNCE_MS, BROWSER_ONLY, ensurePermission, fileAccessSupported, ProjectFileSync, type FileLinkStatus, type ProjectFileHandle } from './projectFile';
 import { createScenario, editScenario, LIVE_ID, promoteScenarioState, type Scenario } from '../engine/scenario';
 import type { SmartKind } from '../engine/smartimport';
 import type { ViewId } from '../engine/systemmap';
@@ -46,6 +47,14 @@ interface HubCtx {
   setPendingImport: (p: PendingImport | null) => void;
   /** Consume the pending import if it is one of `kinds` (returns null otherwise). */
   takePendingImport: (kinds: SmartKind[]) => PendingImport | null;
+  /** Direct Local File Auto-Save status and controls. */
+  fileStatus: FileLinkStatus;
+  linkNewFile: () => Promise<void>;
+  openAndLinkFile: () => Promise<void>;
+  reconnectFile: () => Promise<void>;
+  overwriteFile: () => Promise<void>;
+  reloadFromFile: () => Promise<void>;
+  unlinkFile: () => void;
 }
 
 export interface Toast {
@@ -149,6 +158,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
     setSnapshots(await pushSnapshot(state, label));
   }, [state]);
 
+  const replaceRef = useRef<(s: HubState, label: string, action?: AuditAction) => void>(() => undefined);
   const replaceState = useCallback((s: HubState, label: string, action: AuditAction = 'Snapshot rollback') => {
     void pushSnapshot(state, `Before: ${label}`).then(setSnapshots);
     lastSnap.current = Date.now();
@@ -158,6 +168,112 @@ export function HubProvider({ children }: { children: ReactNode }) {
     setState({ ...audited, updatedAt: new Date().toISOString() });
   }, [state]);
 
+  // ---------------------------------------------------------------- Direct Local File Auto-Save
+  const syncRef = useRef<ProjectFileSync | null>(null);
+  const [fileStatus, setFileStatus] = useState<FileLinkStatus>(BROWSER_ONLY);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const pickerOpts = { types: [{ description: 'Multi-Factory Hub project', accept: { 'application/json': ['.json'] } }] };
+  const unsupported = () => notify('Direct file save is not available here (browser or file:// policy) — your work stays in browser storage; use ⬇ Backup / ⬆ Restore for files.', 'warning');
+  const attach = useCallback(async (handle: ProjectFileHandle) => {
+    const sync = new ProjectFileSync(handle);
+    syncRef.current = sync;
+    void saveFileHandle(handle);
+    return sync;
+  }, []);
+  // Restore a previously linked file: permission must be re-granted from a user gesture.
+  useEffect(() => {
+    if (!fileAccessSupported()) return;
+    void loadFileHandle<ProjectFileHandle>().then(async (h) => {
+      if (!h) return;
+      if (await ensurePermission(h, false).catch(() => false)) {
+        const sync = await attach(h);
+        await sync.adopt().catch(() => undefined);
+        setFileStatus({ mode: 'linked', fileName: h.name });
+      } else setFileStatus({ mode: 'relink', fileName: h.name });
+    });
+  }, [attach]);
+  const writeNow = useCallback(async (force = false) => {
+    const sync = syncRef.current;
+    if (!sync) return;
+    setFileStatus((s) => ({ ...s, mode: 'saving', fileName: sync.fileName }));
+    try {
+      const r = await sync.write(backupJson(stateRef.current), force);
+      setFileStatus(r === 'saved' ? { mode: 'linked', fileName: sync.fileName, savedAt: new Date().toISOString() } : { mode: 'conflict', fileName: sync.fileName });
+      if (r === 'conflict') notify(`${sync.fileName} was changed on disk by someone else — auto-save paused. Overwrite it or reload from the file.`, 'warning');
+    } catch (e) {
+      syncRef.current = null;
+      setFileStatus({ mode: 'error', fileName: sync.fileName, message: (e as Error).message });
+      notify(`Could not write ${sync.fileName}: ${(e as Error).message} — falling back to browser storage.`, 'critical');
+    }
+  }, [notify]);
+  // Debounced disk auto-save on every Live Baseline change (paused while in conflict / not linked).
+  useEffect(() => {
+    if (!ready || !syncRef.current || fileStatus.mode === 'conflict' || fileStatus.mode === 'relink' || fileStatus.mode === 'error') return;
+    const t = setTimeout(() => void writeNow(), AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, ready]);
+  const linkNewFile = useCallback(async () => {
+    if (!fileAccessSupported()) return unsupported();
+    try {
+      const h = (await (window as unknown as { showSaveFilePicker: (o: unknown) => Promise<ProjectFileHandle> }).showSaveFilePicker({ ...pickerOpts, suggestedName: 'multi-factory-hub-project.json' }));
+      await attach(h);
+      await writeNow(true);
+      notify(`Linked ${h.name} — changes now auto-save to disk.`, 'good');
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        setFileStatus({ ...BROWSER_ONLY });
+        unsupported();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attach, writeNow]);
+  const reloadFromFile = useCallback(async () => {
+    const sync = syncRef.current;
+    if (!sync) return;
+    try {
+      const next = parseBackup(await sync.read(), buildSeedState(), sync.fileName);
+      replaceRef.current(next, `Load project file ${sync.fileName}`, 'Backup restore');
+      setFileStatus({ mode: 'linked', fileName: sync.fileName, savedAt: new Date().toISOString() });
+    } catch (e) {
+      notify(`Could not load ${sync.fileName}: ${(e as Error).message}`, 'critical');
+    }
+  }, [notify]);
+  const openAndLinkFile = useCallback(async () => {
+    if (!fileAccessSupported()) return unsupported();
+    try {
+      const [h] = await (window as unknown as { showOpenFilePicker: (o: unknown) => Promise<ProjectFileHandle[]> }).showOpenFilePicker(pickerOpts);
+      if (!(await ensurePermission(h, true))) throw new Error('write permission refused');
+      await attach(h);
+      if (!confirm(`Load “${h.name}” into the hub and keep it linked for auto-save?\n\nThe current state is snapshotted first.`)) {
+        syncRef.current = null;
+        void saveFileHandle(null);
+        return;
+      }
+      await reloadFromFile();
+      notify(`Opened and linked ${h.name}.`, 'good');
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') notify(`Could not open the project file: ${(e as Error).message}`, 'critical');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attach, reloadFromFile]);
+  const reconnectFile = useCallback(async () => {
+    const h = await loadFileHandle<ProjectFileHandle>();
+    if (!h) return setFileStatus({ ...BROWSER_ONLY });
+    if (!(await ensurePermission(h, true).catch(() => false))) return notify('Permission to write the project file was not granted — staying on browser storage.', 'warning');
+    const sync = await attach(h);
+    if (await sync.changedOnDisk().catch(() => false)) return setFileStatus({ mode: 'conflict', fileName: h.name });
+    await writeNow(false);
+  }, [attach, writeNow, notify]);
+  const overwriteFile = useCallback(() => writeNow(true), [writeNow]);
+  const unlinkFile = useCallback(() => {
+    syncRef.current = null;
+    void saveFileHandle(null);
+    setFileStatus({ ...BROWSER_ONLY });
+  }, []);
+
+  replaceRef.current = replaceState;
   const resetToBaseline = useCallback(() => replaceState(buildSeedState(), 'Reset to F1–F4 seed baseline', 'Reset to seed'), [replaceState]);
 
   const signOffLive = useCallback((status: SignOffStatus, note = '') => {
@@ -232,7 +348,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const model = useMemo(() => computeModel(state), [state]);
 
   return (
-    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId, pendingImport, setPendingImport, takePendingImport, toasts, notify, dismissToast, navigateTo, registerNavigator }}>
+    <Ctx.Provider value={{ state, model, ready, backend, savedAt, snapshots, update, replaceState, snapshotNow, resetToBaseline, signOffLive, setCurrentUser, setScenarioStatus, scenarios, newScenario, editScenarioById, renameScenario, deleteScenario, promoteScenario, desSourceId, setDesSourceId, pendingImport, setPendingImport, takePendingImport, toasts, notify, dismissToast, navigateTo, registerNavigator, fileStatus, linkNewFile, openAndLinkFile, reconnectFile, overwriteFile, reloadFromFile, unlinkFile }}>
       {children}
     </Ctx.Provider>
   );

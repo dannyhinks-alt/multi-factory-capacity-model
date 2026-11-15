@@ -12,6 +12,7 @@ import type { BomExplosion, ExplodedLine } from './bom';
 import type { CellMacroBlock, RouteMacroBlock } from './rollup';
 import type { FactoryId, HubState, RouteMapping, StoreTier } from './types';
 import { FACTORIES } from './types';
+import { activeFactoryList } from './settings';
 
 export const STORE_TIERS: StoreTier[] = ['RM', 'KIT', 'WIP', 'FG'];
 
@@ -277,8 +278,11 @@ export function computeStores(state: HubState, explosion: BomExplosion, cells: C
 
   const byFactory = Object.fromEntries(FACTORIES.map((f) => [f, { tiers: emptyTiers(), footprintM2: 0, workingCapitalGbp: 0 }])) as StoresModel['byFactory'];
   const totals = { ...emptyRoll(), tiers: emptyTiers() };
+  const active = new Set(activeFactoryList(state.settings));
   for (const it of [...items, ...buffers]) {
-    for (const r of [byFactory[it.factory].tiers[it.tier], totals.tiers[it.tier], totals]) {
+    // Plant totals cover active factories only (Active Factory Switch); per-factory figures are always kept.
+    const rolls = active.has(it.factory) ? [byFactory[it.factory].tiers[it.tier], totals.tiers[it.tier], totals] : [byFactory[it.factory].tiers[it.tier]];
+    for (const r of rolls) {
       r.stockUnits += it.stockUnits;
       r.locations += it.locations;
       r.footprintM2 += it.footprintM2;

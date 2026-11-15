@@ -10,12 +10,13 @@ import { toCsv } from './csv';
 import { computeModel, factoryKpis, type HubModel } from './model';
 import { routeKey } from './mapping';
 import type { CellMacroBlock, RouteMacroBlock } from './rollup';
-import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
+import { activeFactoryList, SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector, SignOffStatus } from './types';
 import { FACTORIES, QUARTERS, STORE_TIER_NAMES } from './types';
 import { solveWhatIf } from './whatif';
 import { DRIFT_SEVERITY, mergeFixedProcessOnPromotion, reconcile } from './fixedprocess';
 import { canPromote, governanceOf, recordAudit } from './governance';
+import { sharedWorkCentreStatus } from './sharedwc';
 
 // ---------------------------------------------------------------- scenario container
 
@@ -643,6 +644,15 @@ export interface ScenarioMetrics {
   newLocalSteps: number;
   cells: number;
   unmappedParts: number;
+  /** Material flow & spaghetti (active factories). */
+  intraKmPerYear: number;
+  crossFactoryUnits: number;
+  crossFactoryPallets: number;
+  interPlantKmPerYear: number;
+  handlingHoursPerYear: number;
+  /** Shared Work Centres tagged Queue Contention Risk. */
+  sharedWcRisks: number;
+  activeFactories: FactoryId[];
   limitingCells: { cellId: string; utilisationPct: number; constraint: ConstraintKind }[];
 }
 
@@ -694,7 +704,7 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
   let footprintM2 = 0;
   let floorAreaM2 = 0;
   const spaceOverruns: FactoryId[] = [];
-  for (const f of FACTORIES) {
+  for (const f of activeFactoryList(state.settings)) {
     const fk = factoryKpis(model, state, f);
     const ceiling = state.utilities.find((u) => u.factory === f)?.floorAreaM2 ?? 0;
     footprintM2 += fk.factoryFootprintM2;
@@ -705,7 +715,7 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
   const utilityOverruns: string[] = [];
   let utilityRed = 0;
   let utilityAmber = 0;
-  for (const s of model.services) for (const r of s.rows) {
+  for (const s of model.services.filter((x) => model.activeFactories.includes(x.factory))) for (const r of s.rows) {
     if (r.rag === 'Red') { utilityRed++; utilityOverruns.push(`${s.factory} ${SERVICE_LABELS[r.key]} ${Number.isFinite(r.pct) ? r.pct.toFixed(0) : '∞'}%`); }
     else if (r.rag === 'Amber') utilityAmber++;
   }
@@ -743,6 +753,13 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
     peakOverloads: model.cells.filter((c) => c.annualDemand > 0 && c.peakQuarterUtilisationPct >= state.settings.bottleneckPct).length,
     cells: model.cells.length,
     unmappedParts: model.audit.unmappedBomNodes.length,
+    intraKmPerYear: model.flows.totals.intraKmPerYear,
+    crossFactoryUnits: model.flows.totals.crossFactoryUnits,
+    crossFactoryPallets: model.flows.totals.crossFactoryPallets,
+    interPlantKmPerYear: model.flows.totals.interPlantKmPerYear,
+    handlingHoursPerYear: model.flows.totals.handlingHoursPerYear,
+    sharedWcRisks: sharedWorkCentreStatus(state, model).filter((x) => x.risk && model.activeFactories.includes(x.factory)).length,
+    activeFactories: model.activeFactories,
     limitingCells: model.cells
       .filter((c) => c.status === 'Bottleneck')
       .sort((a, b) => b.utilisationPct - a.utilisationPct)
@@ -833,7 +850,7 @@ export function evaluateScenario(id: string, name: string, state: HubState, base
 export interface MatrixRow {
   key: string;
   label: string;
-  unit: '£' | '%' | 'm²' | 'u/yr' | 'count' | 'yrs';
+  unit: '£' | '%' | 'm²' | 'u/yr' | 'count' | 'yrs' | 'km/yr' | 'pallets/yr' | 'h/yr';
   better: 'higher' | 'lower' | 'neutral';
   get: (e: ScenarioEvaluation) => number;
 }
@@ -856,6 +873,11 @@ export const MATRIX_ROWS: MatrixRow[] = [
   { key: 'complianceDeviations', label: 'Fixed Process compliance deviations', unit: 'count', better: 'lower', get: (e) => e.metrics.complianceDeviations },
   { key: 'utilityOverruns', label: 'Utility overruns (Red)', unit: 'count', better: 'lower', get: (e) => e.metrics.utilityRed },
   { key: 'spaceOverruns', label: 'Space ceiling overruns', unit: 'count', better: 'lower', get: (e) => e.metrics.spaceOverruns.length },
+  { key: 'intraTravel', label: 'Intra-factory travel', unit: 'km/yr', better: 'lower', get: (e) => e.metrics.intraKmPerYear },
+  { key: 'crossPallets', label: 'Cross-factory transfers', unit: 'pallets/yr', better: 'lower', get: (e) => e.metrics.crossFactoryPallets },
+  { key: 'interPlantKm', label: 'Inter-plant distance', unit: 'km/yr', better: 'lower', get: (e) => e.metrics.interPlantKmPerYear },
+  { key: 'handling', label: 'Material handling', unit: 'h/yr', better: 'lower', get: (e) => e.metrics.handlingHoursPerYear },
+  { key: 'sharedWcRisk', label: 'Shared Work Centre queue risks', unit: 'count', better: 'lower', get: (e) => e.metrics.sharedWcRisks },
   { key: 'oee', label: 'OEE', unit: '%', better: 'higher', get: (e) => e.metrics.oeePct },
   { key: 'teep', label: 'TEEP', unit: '%', better: 'higher', get: (e) => e.metrics.teepPct },
   { key: 'pce', label: 'PCE', unit: '%', better: 'higher', get: (e) => e.metrics.pcePct },
@@ -877,7 +899,7 @@ export function deltaOf(row: MatrixRow, base: ScenarioEvaluation, sc: ScenarioEv
 
 export interface Effect {
   severity: 'critical' | 'warning' | 'good' | 'info';
-  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing' | 'Stores' | 'Process';
+  area: 'Throughput' | 'Constraint' | 'Capacity' | 'BOM' | 'Schedule' | 'Utility' | 'Space' | 'Gate' | 'Cost' | 'Topology' | 'Routing' | 'Stores' | 'Process' | 'Flow' | 'Factories';
   effect: string;
   causes: string[];
 }
@@ -1119,6 +1141,60 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
     if (ceiling > 0 && was !== now) {
       effects.push({ severity: now ? 'critical' : 'good', area: 'Space', effect: `${f} floor space ${now ? 'exceeds' : 'back within'} its ${Math.round(ceiling).toLocaleString('en-GB')} m² ceiling`, causes: [...added.filter((c) => c.factory === f).map((c) => `${c.cellId} adds ${c.totalFootprintM2.toFixed(0)} m² cell envelope (+35% circulation)`), ...movedCells.filter((c) => c.factory === f).map((c) => `${c.cellId} relocated in (${c.totalFootprintM2.toFixed(0)} m²)`), ...removed.filter((c) => c.factory === f).map((c) => `${c.cellId} removed`), `Stores & buffers ${bm.stores.byFactory[f].footprintM2.toFixed(0)} → ${sm.stores.byFactory[f].footprintM2.toFixed(0)} m²`] });
     }
+  }
+
+  // Active Factory Switch chain
+  const offNow = FACTORIES.filter((f) => !sc.metrics.activeFactories.includes(f));
+  const offWas = FACTORIES.filter((f) => !base.metrics.activeFactories.includes(f));
+  if (offNow.join() !== offWas.join()) {
+    const stranded = sm.cells.filter((c) => offNow.includes(c.factory) && c.annualDemand > 0);
+    effects.push({
+      severity: stranded.length ? 'critical' : 'info',
+      area: 'Factories',
+      effect: `Active factories ${base.metrics.activeFactories.join(', ')} → ${sc.metrics.activeFactories.join(', ')}`,
+      causes: [
+        ...offNow.filter((f) => !offWas.includes(f)).map((f) => `${f} switched off — excluded from KPIs, footprint, shared-plant CapEx, utilities and stores`),
+        ...offWas.filter((f) => !offNow.includes(f)).map((f) => `${f} switched back on`),
+        ...stranded.slice(0, 5).map((c) => `${c.cellId} still carries ${Math.round(c.annualDemand).toLocaleString('en-GB')}/yr in inactive ${c.factory} — relocate or re-route`),
+      ],
+    });
+  }
+
+  // Material flow & spaghetti chain
+  const dKm = sc.metrics.intraKmPerYear - base.metrics.intraKmPerYear;
+  const dRoad = sc.metrics.interPlantKmPerYear - base.metrics.interPlantKmPerYear;
+  if (Math.abs(dKm) > Math.max(5, base.metrics.intraKmPerYear * 0.03) || Math.abs(dRoad) > 1) {
+    const bv = new Map(bm.flows.vectors.map((v) => [`${v.fromId}>${v.toId}`, 0]));
+    for (const v of bm.flows.vectors) bv.set(`${v.fromId}>${v.toId}`, (bv.get(`${v.fromId}>${v.toId}`) ?? 0) + v.internalKmPerYear + v.roadKmPerYear);
+    const sv = new Map<string, number>();
+    for (const v of sm.flows.vectors) sv.set(`${v.fromId}>${v.toId}`, (sv.get(`${v.fromId}>${v.toId}`) ?? 0) + v.internalKmPerYear + v.roadKmPerYear);
+    const keys = new Set([...bv.keys(), ...sv.keys()]);
+    const corridorCauses = [...keys]
+      .map((k) => ({ k, d: (sv.get(k) ?? 0) - (bv.get(k) ?? 0) }))
+      .filter((x) => Math.abs(x.d) > 1)
+      .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
+      .slice(0, 5)
+      .map((x) => `${x.k.replace('>', ' → ')} ${signed(x.d, 0)} km/yr${!bv.has(x.k) ? ' (new corridor)' : !sv.has(x.k) ? ' (corridor removed)' : ''}`);
+    effects.push({
+      severity: dKm + dRoad > 0 ? 'warning' : 'good',
+      area: 'Flow',
+      effect: `Material travel ${Math.round(base.metrics.intraKmPerYear).toLocaleString('en-GB')} → ${Math.round(sc.metrics.intraKmPerYear).toLocaleString('en-GB')} km/yr internal; inter-plant ${Math.round(base.metrics.interPlantKmPerYear).toLocaleString('en-GB')} → ${Math.round(sc.metrics.interPlantKmPerYear).toLocaleString('en-GB')} km/yr; handling ${Math.round(base.metrics.handlingHoursPerYear).toLocaleString('en-GB')} → ${Math.round(sc.metrics.handlingHoursPerYear).toLocaleString('en-GB')} h/yr`,
+      causes: [
+        ...movedCells.map((c) => `${c.cellId} relocated ${bm.cellById.get(c.cellId)!.factory} → ${c.factory}: its feeders now cross the plant boundary`),
+        ...added.map((c) => `${c.cellId} added in ${c.factory} — new dual-source corridors`),
+        `Cross-factory transfers ${Math.round(base.metrics.crossFactoryPallets).toLocaleString('en-GB')} → ${Math.round(sc.metrics.crossFactoryPallets).toLocaleString('en-GB')} pallets/yr`,
+        ...corridorCauses,
+      ].slice(0, 8),
+    });
+  }
+  if (sc.metrics.sharedWcRisks !== base.metrics.sharedWcRisks) {
+    const now = sharedWorkCentreStatus(ss, sm).filter((x) => x.risk);
+    effects.push({
+      severity: sc.metrics.sharedWcRisks > base.metrics.sharedWcRisks ? 'warning' : 'good',
+      area: 'Flow',
+      effect: `Shared Work Centres with Queue Contention Risk ${base.metrics.sharedWcRisks} → ${sc.metrics.sharedWcRisks} — verify in Plant Simulation`,
+      causes: now.slice(0, 5).map((x) => `${x.cellId} ${x.cellName}: ${x.reasons.join('; ')}`),
+    });
   }
 
   // Fixed Process drift chain

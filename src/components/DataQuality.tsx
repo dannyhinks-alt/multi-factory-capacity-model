@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ALIAS_DOMAIN_LABELS, ALIAS_DOMAINS, addAlias, cellDataQuality, knownIds, normalisedPassport, removeAlias, type CellDataQuality } from '../engine/aliases';
+import { ALIAS_DOMAIN_LABELS, ALIAS_DOMAINS, addAlias, cellDataQuality, knownIds, normalisedPassport, removeAlias, unrecognisedIds, type CellDataQuality } from '../engine/aliases';
 import type { AliasDomain, HubState } from '../engine/types';
 import { useHub } from '../store/HubContext';
 import { Badge, Button, Card, Empty, Pills, download, input, td, tdNum, th } from './ui';
@@ -103,6 +103,7 @@ export function AliasManager() {
   const [canonical, setCanonical] = useState('');
   const list = (state.aliases ?? []).filter((a) => a.domain === domain);
   const known = useMemo(() => knownIds(state, domain), [state, domain]);
+  const flagged = useMemo(() => unrecognisedIds(state, domain), [state, domain]);
   const save = () => {
     const a = alias.trim();
     const c = canonical.trim();
@@ -119,7 +120,9 @@ export function AliasManager() {
         <Pills value={domain} onChange={(d) => { setDomain(d); setCanonical(''); }} options={ALIAS_DOMAINS.map((d) => ({ value: d, label: ALIAS_DOMAIN_LABELS[d], count: (state.aliases ?? []).filter((a) => a.domain === d).length }))} />
       </div>
       <form className="mb-3 flex flex-wrap items-center gap-2 text-xs" onSubmit={(e) => { e.preventDefault(); save(); }}>
-        <input aria-label="Nickname" className={`${input} w-48`} placeholder="Incoming nickname (e.g. Cell_A)" value={alias} onChange={(e) => setAlias(e.target.value)} />
+        <input aria-label="Nickname" list={`flagged-${domain}`} className={`${input} w-48`} placeholder="Incoming nickname (e.g. Cell_A)" value={alias} onChange={(e) => setAlias(e.target.value)} title={flagged.length ? `${flagged.length} unrecognised ID(s) flagged in this domain — pick one to map it` : 'No unrecognised IDs flagged in this domain'} />
+        <datalist id={`flagged-${domain}`}>{flagged.map((k) => <option key={k} value={k}>flagged: not a canonical ID</option>)}</datalist>
+        {flagged.length > 0 && <Badge tone="warning" title={flagged.join(', ')}>{flagged.length} flagged</Badge>}
         <span>→</span>
         <input aria-label="Canonical ID" list={`known-${domain}`} className={`${input} w-56`} placeholder="Canonical ID" value={canonical} onChange={(e) => setCanonical(e.target.value)} />
         <datalist id={`known-${domain}`}>{known.map((k) => <option key={k} value={k} />)}</datalist>

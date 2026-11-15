@@ -305,6 +305,56 @@ export interface Dictionary {
   plantSim: PlantSimDefaults;
   /** Governance gate: only Reviewed / Approved scenarios may be promoted to Live Baseline. */
   requireApprovalForPromotion: boolean;
+  /** Active Factory Switch (2–4 plants): inactive factories are excluded from KPIs, footprint, services and stores. */
+  activeFactories: Record<FactoryId, boolean>;
+  /** Road distance between plants (km), keyed `F1-F2` (lower ID first; symmetric). */
+  interPlantKm: Record<string, number>;
+  /** Material-flow, spaghetti and handling assumptions. */
+  flow: FlowDictionary;
+  /** Shared Work Centre queue-contention risk thresholds. */
+  sharedWc: SharedWcRules;
+}
+
+export interface FlowDictionary {
+  /** Parts carried per pallet / stillage move. */
+  unitsPerPallet: number;
+  /** Pick-up + set-down handling minutes per pallet move (internal). */
+  handlingMinPerMove: number;
+  /** Average internal travel speed of forklift / tugger incl. junctions (km/h). */
+  internalSpeedKmh: number;
+  /** Average road speed between plants (km/h). */
+  truckSpeedKmh: number;
+  /** Pallets per inter-plant truck load. */
+  palletsPerTruck: number;
+  /** Truck loading + unloading minutes per pallet. */
+  truckHandlingMinPerPallet: number;
+  /** Auto-grid spacing (m) between block centres when no floor-plan position has been placed. */
+  autoGridAisleM: number;
+}
+
+export interface SharedWcRules {
+  /** Feeding cells at or above this count → Queue Contention Risk. */
+  feederThreshold: number;
+  /** Static utilisation above this % → Queue Contention Risk. */
+  utilisationRiskPct: number;
+}
+
+/** Optional 2D floor-plan image per factory (stored as a data URL, offline). */
+export interface LayoutImage {
+  dataUrl: string;
+  name: string;
+  widthPx: number;
+  heightPx: number;
+}
+
+/** Floor-plan layout of one factory: optional calibrated image + placed block centres (metres). */
+export interface FactoryLayout {
+  image?: LayoutImage;
+  /** Metres per image pixel from 2-point calibration (absent → auto-grid scale from floor area). */
+  metresPerPx?: number;
+  calibration?: { x1: number; y1: number; x2: number; y2: number; metres: number };
+  /** Block centre positions in metres from the plan's top-left corner, keyed by cell / Shared Work Centre / store block ID. */
+  positions: Record<string, { x: number; y: number }>;
 }
 
 export type StoreTier = 'RM' | 'KIT' | 'WIP' | 'FG';
@@ -422,6 +472,10 @@ export interface HubState {
   fixedProcess?: FixedProcessBaseline;
   /** Persistent Alias Dictionary (nicknames → canonical IDs). */
   aliases?: AliasEntry[];
+  /** Cell IDs designated as Shared Work Centres (fed by several cells, e.g. paint lines, anodise, CMM rooms). */
+  sharedWorkCentres?: string[];
+  /** Factory floor-plan layouts (image, scale calibration and block positions). */
+  layouts?: Partial<Record<FactoryId, FactoryLayout>>;
 }
 
 // ---------------------------------------------------------------- Fixed Process governance

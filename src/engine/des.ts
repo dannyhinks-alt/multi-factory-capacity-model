@@ -24,6 +24,11 @@ export interface DesRoutingRow extends Record<string, unknown> {
   microOpsFolded: number;
   bindingConstraint: string;
   capacityUnitsPerYear: number;
+  /** Total Route Lead Time per transfer batch (Σ setup + batch × Σ touch + walk-away), min. */
+  routeLeadTimeMin: number;
+  touchMinPerUnit: number;
+  walkAwayMinPerUnit: number;
+  sharedWorkCentre: boolean;
   demandAnnual: number;
   demandQ1: number;
   demandQ2: number;
@@ -47,7 +52,8 @@ export interface DesScheduleRow extends Record<string, unknown> {
  * Build the flat DES routing table from the folded Macro-Operations.
  * Each passport route becomes exactly one simulation block (thousands of micro-steps collapse to ~1 row per route).
  */
-export function buildDesRouting(model: HubModel): DesRoutingRow[] {
+export function buildDesRouting(model: HubModel, sharedWorkCentres: string[] = []): DesRoutingRow[] {
+  const shared = new Set(sharedWorkCentres);
   const rows: DesRoutingRow[] = [];
   for (const c of model.cells) {
     c.routes.forEach((r, i) => {
@@ -74,6 +80,10 @@ export function buildDesRouting(model: HubModel): DesRoutingRow[] {
         microOpsFolded: r.microOps,
         bindingConstraint: r.bindingConstraint,
         capacityUnitsPerYear: r.bindingCapUnits,
+        routeLeadTimeMin: r.routeLeadTimeMin,
+        touchMinPerUnit: r.touchMinPerUnit,
+        walkAwayMinPerUnit: r.walkAwayMinPerUnit,
+        sharedWorkCentre: shared.has(c.cellId),
         demandAnnual: r.demand.annual,
         demandQ1: r.demand.byQuarter.Q1,
         demandQ2: r.demand.byQuarter.Q2,

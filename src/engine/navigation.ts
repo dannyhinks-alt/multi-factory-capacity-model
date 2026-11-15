@@ -40,6 +40,7 @@ export const PHASES: PhaseDef[] = [
     label: 'Design & Scenarios',
     views: [
       { id: 'cells', label: 'Cells & Macro-Routing', hint: 'F1–F4 explorer, What-If' },
+      { id: 'layout', label: 'Factory Floor-Plan Layout', hint: 'Blocks, spaghetti & travel' },
       { id: 'services', label: 'Facility & Cell Services', hint: 'Utilities & shared plant' },
       { id: 'scenarios', label: 'Static Scenario Planner', hint: 'What-if & cause-effect' },
     ],

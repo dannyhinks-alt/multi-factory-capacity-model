@@ -3,6 +3,9 @@ import type { NavTarget } from '../App';
 import { Badge, Button, Card, DropZone, FactoryFilter, Pills, Stat, download, fmtNum, fmtPct, input, td, tdNum, th } from '../components/ui';
 import { computeModel } from '../engine/model';
 import { TecnomatixPanel } from '../components/TecnomatixPanel';
+import { ArchitectureCard } from '../components/ArchitectureCard';
+import { explain } from '../engine/glossary';
+import { Hint } from '../components/ui';
 import { LIVE_ID } from '../engine/scenario';
 import { toCsv } from '../engine/csv';
 import { buildDesRouting, buildDesSchedule, compareDes, parseDesResults, sampleDesResults } from '../engine/des';
@@ -33,7 +36,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImport]);
-  const routing = useMemo(() => buildDesRouting(model).filter((r) => scope === 'All' || r.factory === scope), [model, scope]);
+  const routing = useMemo(() => buildDesRouting(model, state.sharedWorkCentres).filter((r) => scope === 'All' || r.factory === scope), [model, state.sharedWorkCentres, scope]);
   const schedule = useMemo(() => buildDesSchedule(routing), [routing]);
   const comparison = useMemo(() => compareDes(model, state.desResults, state.settings).filter((c) => scope === 'All' || c.factory === scope), [model, state.desResults, state.settings, scope]);
   const microOps = routing.reduce((s, r) => s + r.microOpsFolded, 0);
@@ -76,6 +79,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
         </div>
         <div className="text-xs text-slate-500">Analytic utilisation tolerance ± {state.settings.desTolerancePct} pp · buffer limit {state.settings.desBufferLimit}</div>
       </div>
+      <ArchitectureCard />
       <Pills
         value={preset}
         onChange={setPreset}
@@ -107,7 +111,10 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
           <table className="w-full">
             <thead className="sticky top-0 z-10">
               <tr>
-                {['Macro-op', 'Factory', 'Cell', 'Variant', 'Resource group', 'Qty', 'Batch', 'Setup min', 'Cycle min', 'Eff. cycle', 'OEE', 'Folded ops', 'Binding', 'Cap/yr', 'Demand/yr', 'Q1', 'Q2', 'Q3', 'Q4'].map((h) => <th key={h} className={th}>{h}</th>)}
+                {['Macro-op', 'Factory', 'Cell', 'Variant', 'Resource group', 'Qty', 'Batch', 'Setup min'].map((h) => <th key={h} className={th}>{h}</th>)}
+                <th className={th}>Bottleneck cycle min<Hint text={explain('bottleneckCycle')} /></th>
+                <th className={th}>Route lead time min<Hint text={explain('leadTime')} /></th>
+                {['Eff. cycle', 'OEE', 'Folded ops', 'Binding', 'Cap/yr', 'Demand/yr', 'Q1', 'Q2', 'Q3', 'Q4'].map((h) => <th key={h} className={th}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -121,7 +128,8 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
                   <td className={tdNum}>{r.resourceQty}</td>
                   <td className={tdNum}>{r.batchSize}</td>
                   <td className={tdNum}>{fmtNum(r.setupMin, 1)}</td>
-                  <td className={tdNum}>{fmtNum(r.cycleMin, 1)}</td>
+                  <td className={tdNum}>{fmtNum(r.cycleMin, 2)}</td>
+                  <td className={tdNum}>{fmtNum(r.routeLeadTimeMin, 1)}{r.sharedWorkCentre && <span className="ml-1 rounded bg-orange-50 px-1 text-[10px] font-semibold text-orange-800" title="Shared Work Centre">SWC</span>}</td>
                   <td className={tdNum}>{fmtNum(r.effectiveCycleMin, 1)}</td>
                   <td className={tdNum}>{fmtPct(r.oeePct)}</td>
                   <td className={tdNum}>{r.microOpsFolded}</td>

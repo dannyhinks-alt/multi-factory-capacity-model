@@ -6,6 +6,7 @@ import { importMasterRows, columnScore, fuzzyMapColumns, TARGET_FIELDS, applyCol
 import type { IngestReport } from '../engine/ingest';
 import { ALIAS_DOMAIN_LABELS, addAlias, ingestWithAliases, knownIds, preparePassports, type IdCheck, type PreparedPassport } from '../engine/aliases';
 import { AliasManager, DataQualityPanel } from '../components/DataQuality';
+import { ActiveFactoryToggles } from '../components/ActiveFactories';
 import { MASTER_TARGET } from '../engine/smartimport';
 import { LEGACY_FIELDS, applyLegacy, convertLegacy, mapLegacyColumns, type LegacyConversion } from '../engine/legacy';
 import { COMPLEXITY_CLASSES } from '../engine/settings';
@@ -58,6 +59,10 @@ interface Col<T> {
   label: string;
   type: 'string' | 'number';
   w?: string;
+  /** Master-data dropdown (fixed choices, may depend on the row, e.g. cells of the row's factory). */
+  options?: (row: T) => { value: string; label: string }[];
+  /** Combo-box suggestions (<datalist>) — free text still allowed. */
+  suggestions?: string[];
 }
 
 function CatalogueTable<T extends Record<string, any>>({ title, subtitle, rows, cols, keyOf, onChange, onAdd, filename, referenced }: { title: string; subtitle: string; rows: T[]; cols: Col<T>[]; keyOf: (t: T) => string; onChange: (rows: T[]) => void; onAdd: () => T; filename: string; referenced: Set<string> }) {
@@ -96,6 +101,22 @@ function CatalogueTable<T extends Record<string, any>>({ title, subtitle, rows, 
                     <td key={c.key} className={c.type === 'number' ? tdNum : td}>
                       {c.key === cols[0].key ? (
                         <span className="font-mono text-[11px]">{String(r[c.key])}</span>
+                      ) : c.options ? (
+                        <select className={`${input} ${c.w ?? 'w-40'}`} value={String(r[c.key] ?? '')} onChange={(e) => set(k, c.key, e.target.value)} aria-label={c.label}>
+                          {(() => {
+                            const opts = c.options(r);
+                            const cur = String(r[c.key] ?? '');
+                            return [...(opts.some((o) => o.value === cur) ? [] : [{ value: cur, label: cur ? `${cur} (not in master data)` : '—' }]), ...opts].map((o) => <option key={o.value} value={o.value}>{o.label}</option>);
+                          })()}
+                        </select>
+                      ) : c.suggestions ? (
+                        <input
+                          className={`${input} ${c.w ?? 'w-40'}`}
+                          list={`dl-${filename}-${c.key}`}
+                          value={r[c.key] ?? ''}
+                          aria-label={c.label}
+                          onChange={(e) => set(k, c.key, e.target.value)}
+                        />
                       ) : (
                         <input
                           className={`${input} ${c.w ?? (c.type === 'number' ? 'w-20' : 'w-40')} ${c.type === 'number' ? 'text-right' : ''}`}
@@ -115,6 +136,9 @@ function CatalogueTable<T extends Record<string, any>>({ title, subtitle, rows, 
             })}
           </tbody>
         </table>
+        {cols.filter((c) => c.suggestions).map((c) => (
+          <datalist key={c.key} id={`dl-${filename}-${c.key}`}>{c.suggestions!.map((v) => <option key={v} value={v} />)}</datalist>
+        ))}
         {filtered.length > limit && <div className="p-2 text-center"><Button onClick={() => setLimit(limit + 200)}>Show more ({filtered.length - limit} hidden)</Button></div>}
       </div>
     </Card>
@@ -139,6 +163,11 @@ function useRefs() {
 function AssetsTable() {
   const { state, update } = useHub();
   const refs = useRefs();
+  const shared = new Set(state.sharedWorkCentres ?? []);
+  const cellOptions = (a: Asset) => [
+    { value: '', label: '— unassigned —' },
+    ...state.passports.filter((p) => p.factory === a.factory).sort((x, y) => x.cellId.localeCompare(y.cellId)).map((p) => ({ value: p.cellId, label: `${p.cellId}${shared.has(p.cellId) ? ' · Shared WC' : ''} — ${p.cellName}` })),
+  ];
   return (
     <CatalogueTable<Asset>
       title="Master Asset catalogue"
@@ -152,10 +181,10 @@ function AssetsTable() {
       cols={[
         { key: 'assetId', label: 'Asset ID', type: 'string' },
         { key: 'description', label: 'Description', type: 'string', w: 'w-48' },
-        { key: 'factory', label: 'Factory', type: 'string', w: 'w-12' },
-        { key: 'cellId', label: 'Cell ID', type: 'string', w: 'w-20' },
-        { key: 'category', label: 'Category', type: 'string', w: 'w-40' },
-        { key: 'complexityClass', label: 'Cx', type: 'string', w: 'w-10' },
+        { key: 'factory', label: 'Factory', type: 'string', w: 'w-16', options: () => FACTORIES.map((f) => ({ value: f, label: `${f}${state.settings.activeFactories?.[f] === false ? ' (inactive)' : ''}` })) },
+        { key: 'cellId', label: 'Cell ID / Shared WC', type: 'string', w: 'w-48', options: cellOptions },
+        { key: 'category', label: 'Category', type: 'string', w: 'w-40', suggestions: [...new Set(state.assets.map((a) => a.category))].sort() },
+        { key: 'complexityClass', label: 'Complexity', type: 'string', w: 'w-24', options: () => COMPLEXITY_CLASSES.map((c) => ({ value: c, label: `${c} · ${state.settings.complexityPct[c]}% OEE` })) },
         { key: 'shiftTier', label: 'Shift tier', type: 'number', w: 'w-12' },
         { key: 'footprintM2', label: 'Footprint m²', type: 'number', w: 'w-16' },
         { key: 'oeePct', label: 'OEE %', type: 'number', w: 'w-14' },
@@ -187,7 +216,7 @@ function FixturesTable() {
       cols={[
         { key: 'toolingId', label: 'Tooling ID', type: 'string' },
         { key: 'description', label: 'Description', type: 'string', w: 'w-64' },
-        { key: 'linkedAsset', label: 'Linked Asset', type: 'string', w: 'w-40' },
+        { key: 'linkedAsset', label: 'Linked Asset', type: 'string', w: 'w-44', suggestions: state.assets.map((a) => a.assetId).sort() },
         { key: 'qty', label: 'Qty', type: 'number', w: 'w-14' },
         { key: 'maxDwellPct', label: 'Max Dwell %', type: 'number', w: 'w-16' },
         { key: 'costGbp', label: 'Cost £', type: 'number', w: 'w-20' },
@@ -211,7 +240,7 @@ function SkillsTable() {
       onAdd={() => ({ roleId: `R-NEW-${Date.now() % 10000}`, skillId: 'SK-NEW', description: 'New role', hourlyRateGbp: 20 })}
       cols={[
         { key: 'roleId', label: 'Role ID', type: 'string' },
-        { key: 'skillId', label: 'Skill ID', type: 'string', w: 'w-28' },
+        { key: 'skillId', label: 'Skill ID', type: 'string', w: 'w-32', suggestions: [...new Set([...state.skills.map((x) => x.skillId), ...state.passports.flatMap((p) => [...p.routes.flatMap((r) => r.ops.map((o) => o.skillId ?? '')), ...p.crew.flatMap((c) => Object.keys(c.competence))])])].filter(Boolean).sort() },
         { key: 'description', label: 'Description', type: 'string', w: 'w-64' },
         { key: 'hourlyRateGbp', label: 'Hourly Rate £/hr', type: 'number', w: 'w-20' },
       ]}
@@ -770,6 +799,12 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
       <span className="flex items-center gap-1"><input type="number" step="any" className={`${input} w-20 text-right`} value={s.stores[key]} onChange={(e) => set({ stores: { ...s.stores, [key]: +e.target.value } })} />{suffix}</span>
     </label>
   );
+  const flowNum = (label: string, key: keyof Dictionary['flow'], suffix = '') => (
+    <label className="flex items-center justify-between gap-2 text-xs text-slate-700">
+      <span>{label}</span>
+      <span className="flex items-center gap-1"><input type="number" step="any" className={`${input} w-20 text-right`} value={s.flow[key]} onChange={(e) => set({ flow: { ...s.flow, [key]: Math.max(0, +e.target.value) } })} />{suffix}</span>
+    </label>
+  );
   const body = (
     <div className="space-y-2">
       {num('Weeks per year', 'weeksPerYear')}
@@ -794,6 +829,28 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
           {num('DES buffer queue limit', 'desBufferLimit', 'units')}
           {num('Contribution margin per top Assembly (scenario payback)', 'contributionMarginGbp', '£')}
           {num('Depreciation period (unit conversion cost)', 'depreciationYears', 'yrs')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Active factories (2–4 plant network)</div>
+          <ActiveFactoryToggles value={s.activeFactories} onChange={(next) => set({ activeFactories: next })} />
+          <p className="text-[10px] text-slate-500">Inactive plants are excluded from KPIs, footprint, shared-plant CapEx, utility balances, stores roll-ups and filter pills; cells still assigned to them are flagged in Logic Integrity and Guided Next Actions.</p>
+          <div className="pt-2 text-xs font-semibold text-slate-700">Inter-plant road distances (km)</div>
+          <div className="grid grid-cols-3 gap-2">
+            {FACTORIES.flatMap((a, i) => FACTORIES.slice(i + 1).map((b) => `${a}-${b}`)).map((k) => (
+              <label key={k} className="flex items-center gap-1 text-xs text-slate-700">{k.replace('-', ' ↔ ')}
+                <input type="number" step="any" className={`${input} w-16 text-right`} value={s.interPlantKm[k] ?? 0} onChange={(e) => set({ interPlantKm: { ...s.interPlantKm, [k]: Math.max(0, +e.target.value) } })} />
+              </label>
+            ))}
+          </div>
+          <div className="pt-2 text-xs font-semibold text-slate-700">Material flow & handling</div>
+          {flowNum('Parts per pallet / stillage move', 'unitsPerPallet')}
+          {flowNum('Pick-up + set-down per pallet move', 'handlingMinPerMove', 'min')}
+          {flowNum('Internal travel speed (forklift / tugger)', 'internalSpeedKmh', 'km/h')}
+          {flowNum('Road speed between plants', 'truckSpeedKmh', 'km/h')}
+          {flowNum('Pallets per truck', 'palletsPerTruck')}
+          {flowNum('Truck loading + unloading per pallet', 'truckHandlingMinPerPallet', 'min')}
+          {flowNum('Auto-grid aisle between blocks', 'autoGridAisleM', 'm')}
+          <div className="pt-2 text-xs font-semibold text-slate-700">Shared Work Centre queue-contention risk</div>
+          <label className="flex items-center justify-between gap-2 text-xs text-slate-700"><span>Feeding cells at or above</span><input type="number" className={`${input} w-20 text-right`} value={s.sharedWc.feederThreshold} onChange={(e) => set({ sharedWc: { ...s.sharedWc, feederThreshold: Math.max(1, Math.round(+e.target.value)) } })} /></label>
+          <label className="flex items-center justify-between gap-2 text-xs text-slate-700"><span>Static utilisation above</span><span className="flex items-center gap-1"><input type="number" className={`${input} w-20 text-right`} value={s.sharedWc.utilisationRiskPct} onChange={(e) => set({ sharedWc: { ...s.sharedWc, utilisationRiskPct: Math.max(0, +e.target.value) } })} />%</span></label>
           <div className="pt-2 text-xs font-semibold text-slate-700">Governance</div>
           <label className="flex items-start gap-2 text-xs text-slate-700">
             <input type="checkbox" className="mt-0.5" checked={!!s.requireApprovalForPromotion} onChange={(e) => set({ requireApprovalForPromotion: e.target.checked })} />

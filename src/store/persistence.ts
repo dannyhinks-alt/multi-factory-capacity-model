@@ -86,6 +86,10 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
       complexityPct: { ...DEFAULT_DICTIONARY.complexityPct, ...(r.settings?.complexityPct ?? {}) },
       drift: { ...DEFAULT_DICTIONARY.drift, ...(r.settings?.drift ?? {}) },
       plantSim: { ...DEFAULT_DICTIONARY.plantSim, ...(r.settings?.plantSim ?? {}) },
+      activeFactories: { ...DEFAULT_DICTIONARY.activeFactories, ...(r.settings?.activeFactories ?? {}) },
+      interPlantKm: { ...DEFAULT_DICTIONARY.interPlantKm, ...(r.settings?.interPlantKm ?? {}) },
+      flow: { ...DEFAULT_DICTIONARY.flow, ...(r.settings?.flow ?? {}) },
+      sharedWc: { ...DEFAULT_DICTIONARY.sharedWc, ...(r.settings?.sharedWc ?? {}) },
       stores: {
         ...DEFAULT_DICTIONARY.stores,
         ...(r.settings?.stores ?? {}),
@@ -97,6 +101,9 @@ export function migrateState(raw: unknown, fallback: HubState): HubState {
     // Older saved data without a Fixed Process layer: adopt the seeded Fixed Process Baseline (locked reference layer).
     fixedProcess: r.fixedProcess ?? fallback.fixedProcess,
     aliases: r.aliases ?? [],
+    // Older saved data: adopt the seeded Shared Work Centre designations; layouts start on the auto-grid.
+    sharedWorkCentres: r.sharedWorkCentres ?? fallback.sharedWorkCentres ?? [],
+    layouts: r.layouts ?? {},
     // Older saved data without stores / governance: L5 unit costs and floor ceilings (now incl. stores) come from the baseline seed where missing.
     bom: r.governance ? r.bom : r.bom.map((b) => (b.unitCostGbp === undefined && b.level === 5 ? { ...b, unitCostGbp: fallback.bom.find((x) => x.partId === b.partId)?.unitCostGbp } : b)),
     desResults: r.desResults ?? [],
@@ -136,6 +143,29 @@ export async function saveState(state: HubState): Promise<'indexeddb' | 'localst
     }
   }
   return lsSet(LS_STATE, state) ? 'localstorage' : 'none';
+}
+
+/** Remember the linked project-file handle (structured-clonable in IndexedDB; ignored elsewhere). */
+export async function saveFileHandle(handle: unknown | null): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  try {
+    if (handle) await tx(db, STATE_STORE, 'readwrite', (s) => s.put(handle, 'projectFileHandle'));
+    else await tx(db, STATE_STORE, 'readwrite', (s) => s.delete('projectFileHandle'));
+  } catch {
+    /* handle not clonable in this browser — the link simply lasts for this session */
+  }
+}
+
+/** Restore the previously linked project-file handle, if any. */
+export async function loadFileHandle<T>(): Promise<T | null> {
+  const db = await openDb();
+  if (!db) return null;
+  try {
+    return ((await tx<T>(db, STATE_STORE, 'readonly', (s) => s.get('projectFileHandle'))) ?? null) as T | null;
+  } catch {
+    return null;
+  }
 }
 
 export async function listSnapshots(): Promise<Snapshot[]> {

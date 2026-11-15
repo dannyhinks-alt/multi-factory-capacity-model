@@ -36,12 +36,12 @@ const singleMapped = (() => {
 })();
 
 // ------------------------------------------------------------------------------------------ release
-describe('v1.0 release identity', () => {
-  it('package.json, version module and default baseline agree on v1.0', () => {
+describe('Release identity', () => {
+  it('package.json and the version module agree on release v1.1; the default baseline starts at v1.0', () => {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-    expect(pkg.version).toBe('1.0.0');
+    expect(pkg.version).toBe('1.1.0');
     expect(APP_VERSION).toBe(pkg.version);
-    expect(APP_VERSION_LABEL).toBe('v1.0');
+    expect(APP_VERSION_LABEL).toBe('v1.1');
     expect(APP_NAME).toBe('Multi-Factory Master Control Hub');
     expect(versionLabel(seed.governance!)).toBe('v1.0');
   });
@@ -59,11 +59,11 @@ describe('v1.0 release identity', () => {
     const tag = new RegExp(['V1', '\\.[1-9]\\b'].join(''));
     const offenders = files.filter((f) => tag.test(readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
-    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('<title>Multi-Factory Master Control Hub v1.0</title>');
+    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('<title>Multi-Factory Master Control Hub v1.1</title>');
   });
   it('stamps backups and normalised passports with the release version', () => {
-    expect(JSON.parse(backupJson(seed)).appVersion).toBe('1.0.0');
-    expect((normalisedPassport(seed, 'CELL-A')!.normalisation as { exportedBy: string }).exportedBy).toBe('Multi-Factory Master Control Hub v1.0');
+    expect(JSON.parse(backupJson(seed)).appVersion).toBe('1.1.0');
+    expect((normalisedPassport(seed, 'CELL-A')!.normalisation as { exportedBy: string }).exportedBy).toBe('Multi-Factory Master Control Hub v1.1');
   });
 });
 

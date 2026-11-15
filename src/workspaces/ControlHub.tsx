@@ -3,6 +3,10 @@ import type { NavTarget } from '../App';
 import { AuditPanel } from '../components/AuditPanel';
 import { IntegrityPanel } from '../components/Governance';
 import { NextActionsStrip } from '../components/NextActions';
+import { ReadinessStrip } from '../components/Readiness';
+import { FlowLeaderboard } from '../components/FlowLeaderboard';
+import { ActiveFactoryToggles } from '../components/ActiveFactories';
+import { explain } from '../engine/glossary';
 import { STORE_TIERS } from '../engine/stores';
 import { Badge, Button, Card, ConstraintTag, FactoryFilter, Meter, Stat, fmtGbp, fmtNum, fmtPct, statusTone, td, tdNum, th } from '../components/ui';
 import { UtilChart } from '../components/UtilChart';
@@ -13,34 +17,43 @@ import { FACTORY_NAMES, STORE_TIER_NAMES } from '../engine/types';
 import { useHub } from '../store/HubContext';
 
 export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => void }) {
-  const { model, state } = useHub();
-  const [scope, setScope] = useState<FactoryId | 'All'>('All');
+  const { model, state, update } = useHub();
+  const [scopeRaw, setScope] = useState<FactoryId | 'All'>('All');
+  // A factory switched off falls back to the active-plant view.
+  const scope = scopeRaw === 'All' || model.activeFactories.includes(scopeRaw) ? scopeRaw : 'All';
   const k = useMemo(() => factoryKpis(model, state, scope), [model, state, scope]);
-  const cells = model.cells.filter((c) => scope === 'All' || c.factory === scope);
+  const inScope = (f: FactoryId) => (scope === 'All' ? model.activeFactories.includes(f) : f === scope);
+  const cells = model.cells.filter((c) => inScope(c.factory));
   const s = state.settings;
-  const services = model.services.filter((f) => scope === 'All' || f.factory === scope);
+  const services = model.services.filter((f) => inScope(f.factory));
   const exceptions = [...k.bottlenecks, ...k.blocked.filter((c) => c.status !== 'Bottleneck'), ...k.overUtility.filter((c) => c.status !== 'Bottleneck' && c.gateStatus !== 'BLOCKED')];
   const pceTotal = k.pce.va + k.pce.nva + k.pce.enva || 1;
 
   return (
     <>
+      <ReadinessStrip navigate={navigate} />
       <NextActionsStrip navigate={navigate} />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <FactoryFilter value={scope} onChange={setScope} />
-        <div className="text-xs text-slate-500">{scope === 'All' ? `${k.cells} cells across F1–F4` : FACTORY_NAMES[scope]} · {fmtNum(k.annualOutput)} top Assemblies / yr scheduled</div>
+        <div className="flex flex-wrap items-center gap-3">
+          <FactoryFilter value={scope} onChange={setScope} factories={model.activeFactories} />
+          <ActiveFactoryToggles compact value={s.activeFactories} onChange={(next, f) => update((st) => ({ ...st, settings: { ...st.settings, activeFactories: next } }), `${f} switched ${next[f] ? 'on' : 'off'} (Active Factory Switch)`)} />
+        </div>
+        <div className="text-xs text-slate-500">{scope === 'All' ? `${k.cells} cells across ${model.activeFactories.join(', ')}` : FACTORY_NAMES[scope]} · {fmtNum(k.annualOutput)} top Assemblies / yr scheduled</div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Stat label="Total CapEx" value={fmtGbp(k.totalCapexGbp)} sub={`Cells ${fmtGbp(k.cellCapexGbp)} + shared ${fmtGbp(k.sharedPlantCapexGbp)}`} />
-        <Stat label="Footprint" value={`${fmtNum(k.totalFootprintM2)} m²`} sub={`Cells ${fmtNum(k.factoryFootprintM2)} (incl. circulation) + stores ${fmtNum(k.storesFootprintM2)} m²`} />
-        <Stat label="Stores & WIP" value={fmtGbp(k.workingCapitalGbp)} sub={`Working capital · ${fmtNum(k.storesFootprintM2)} m² stores & buffers`} />
-        <Stat label="Avg utilisation" value={fmtPct(k.avgUtilisationPct, 1)} tone={k.avgUtilisationPct >= s.bottleneckPct ? 'critical' : k.avgUtilisationPct >= s.nearLimitPct ? 'warning' : 'good'} sub="Demand-loaded cells" />
-        <Stat label="OEE" value={fmtPct(k.avgOeePct, 1)} sub="Effective cell OEE" />
-        <Stat label="TEEP" value={fmtPct(k.avgTeepPct, 1)} sub="OEE × loading" />
-        <Stat label="PCE" value={fmtPct(k.pce.pct, 1)} sub="VA ÷ (VA+NVA+ENVA)" />
-        <Stat label="Bottleneck cells" value={k.bottlenecks.length} tone={k.bottlenecks.length ? 'critical' : 'good'} sub={`${k.nearLimit.length} near limit (≥ ${s.nearLimitPct}%)`} />
-        <Stat label="Blocked cells" value={k.blocked.length} tone={k.blocked.length ? 'critical' : 'good'} sub={`${k.overUtility.length} over-utility`} />
+        <Stat label="Total CapEx" value={fmtGbp(k.totalCapexGbp)} sub={`Cells ${fmtGbp(k.cellCapexGbp)} + shared ${fmtGbp(k.sharedPlantCapexGbp)}`} hint={explain('totalCapex')} />
+        <Stat label="Footprint" value={`${fmtNum(k.totalFootprintM2)} m²`} sub={`Cells ${fmtNum(k.factoryFootprintM2)} (incl. circulation) + stores ${fmtNum(k.storesFootprintM2)} m²`} hint={explain('footprint')} />
+        <Stat label="Stores & WIP" value={fmtGbp(k.workingCapitalGbp)} sub={`Working capital · ${fmtNum(k.storesFootprintM2)} m² stores & buffers`} hint={explain('storesWip')} />
+        <Stat label="Avg utilisation" value={fmtPct(k.avgUtilisationPct, 1)} tone={k.avgUtilisationPct >= s.bottleneckPct ? 'critical' : k.avgUtilisationPct >= s.nearLimitPct ? 'warning' : 'good'} sub="Demand-loaded cells" hint={explain('avgUtilisation')} />
+        <Stat label="OEE" value={fmtPct(k.avgOeePct, 1)} sub="Effective cell OEE" hint={explain('oee')} />
+        <Stat label="TEEP" value={fmtPct(k.avgTeepPct, 1)} sub="OEE × loading" hint={explain('teep')} />
+        <Stat label="PCE" value={fmtPct(k.pce.pct, 1)} sub="VA ÷ (VA+NVA+ENVA)" hint={explain('pce')} />
+        <Stat label="Bottleneck cells" value={k.bottlenecks.length} tone={k.bottlenecks.length ? 'critical' : 'good'} sub={`${k.nearLimit.length} near limit (≥ ${s.nearLimitPct}%)`} hint={explain('bottlenecks')} />
+        <Stat label="Blocked cells" value={k.blocked.length} tone={k.blocked.length ? 'critical' : 'good'} sub={`${k.overUtility.length} over-utility`} hint={explain('blocked')} />
+        <Stat label="Material handling" value={`${fmtNum(scope === 'All' ? model.flows.totals.handlingHoursPerYear : model.flows.byFactory.find((f) => f.factory === scope)!.handlingHoursPerYear)} h/yr`} sub={scope === 'All' ? `${fmtNum(model.flows.totals.intraKmPerYear)} km/yr internal · ${fmtNum(model.flows.totals.crossFactoryPallets)} cross-factory pallets` : `${fmtNum(model.flows.byFactory.find((f) => f.factory === scope)!.intraKmPerYear)} km/yr internal travel`} hint={explain('handling')} />
       </div>
+      <FlowLeaderboard scope={scope} navigate={navigate} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2" title="Cell utilisation by factory" subtitle="Binding resource utilisation (MIN of Machine, Competent Labour ≥ 2, Tooling Dwell) against BOM-driven demand. Click a bar to open the cell.">
@@ -99,7 +112,7 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
                       <div className="font-mono text-[11px] text-slate-500">{c.factory} · {c.cellId}</div>
                       <div className="font-medium text-slate-800">{c.cellName}</div>
                     </td>
-                    <td className={td}><Meter pct={c.utilisationPct} near={s.nearLimitPct} limit={s.bottleneckPct} width="w-24" /></td>
+                    <td className={td}><Meter pct={c.utilisationPct} near={s.nearLimitPct} limit={s.bottleneckPct} width="w-24" title={`${fmtPct(c.utilisationPct, 1)} of binding capacity used — ${explain('avgUtilisation')}`} /></td>
                     <td className={td}><ConstraintTag kind={c.bindingConstraint} /></td>
                     <td className={td}>
                       <div className="flex flex-wrap gap-1">

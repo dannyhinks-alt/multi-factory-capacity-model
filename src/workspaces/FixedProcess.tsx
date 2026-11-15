@@ -39,6 +39,8 @@ export default function FixedProcess({ navigate, initialTab }: { navigate: (t: N
   const { state, scenarios, takePendingImport, pendingImport } = useHub();
   const [sourceId, setSourceId] = useState(LIVE_ID);
   const [tab, setTab] = useState<'drift' | 'baseline' | 'revision'>(initialTab === 'baseline' || initialTab === 'revision' ? initialTab : 'drift');
+  // Deep links such as `drift:COMPLIANCE DEVIATION` (Model & FPD Readiness strip) pre-filter the drift list.
+  const initialCls = initialTab?.startsWith('drift:') ? (initialTab.slice(6) as DriftClass) : undefined;
   // Smart Import hand-off: open the revision diff with the detected file pre-loaded.
   const [incomingFile, setIncomingFile] = useState<File | null>(null);
   useEffect(() => {
@@ -80,21 +82,47 @@ export default function FixedProcess({ navigate, initialTab }: { navigate: (t: N
         </div>
       </Card>
       <Pills value={tab} onChange={setTab} options={[{ value: 'drift', label: 'Live Drift Reconciliation' }, { value: 'baseline', label: 'Locked Baseline Documents' }, { value: 'revision', label: 'Compare / Ingest Updated Revision' }]} />
-      {tab === 'drift' && <DriftView items={report.items} byCell={report.byCell} scenarioId={source?.id} scenarioName={source?.name} navigate={navigate} />}
+      {tab === 'drift' && <DriftView items={report.items} byCell={report.byCell} scenarioId={source?.id} scenarioName={source?.name} navigate={navigate} initialCls={initialCls && DRIFT_CLASSES.includes(initialCls) ? initialCls : undefined} />}
       {tab === 'baseline' && <BaselineView />}
       {tab === 'revision' && <RevisionView initialFile={incomingFile} />}
     </>
   );
 }
 
-function DriftView({ items, byCell, scenarioId, scenarioName, navigate }: { items: DriftItem[]; byCell: ReturnType<typeof reconcile>['byCell']; scenarioId?: string; scenarioName?: string; navigate: (t: NavTarget) => void }) {
+/**
+ * Horizontal variance bar: working time vs the Fixed Process standard (Δ%), centred on zero, scaled to
+ * ±(compliance tolerance × 2), coloured green within tolerance, amber up to compliance, red beyond.
+ */
+function VarianceBar({ pct, tol, comp, what }: { pct: number; tol: number; comp: number; what: string }) {
+  if (!Number.isFinite(pct)) return null;
+  const span = Math.max(comp * 2, 10);
+  const w = Math.min(Math.abs(pct), span) / span * 50;
+  const a = Math.abs(pct);
+  const colour = a <= tol ? '#0ca30c' : a <= comp ? '#fab219' : '#d03b3b';
+  const band = a <= tol ? 'within tolerance' : a <= comp ? 'maturing drift' : 'beyond the compliance limit';
+  return (
+    <div className="ml-auto mt-0.5 flex w-28 items-center" title={`${what} is ${pct >= 0 ? `${pct.toFixed(1)}% longer` : `${Math.abs(pct).toFixed(1)}% shorter`} than the Fixed Process standard — ${band} (±${tol}% tolerance, ±${comp}% compliance).`}>
+      <div className="relative h-2 w-full rounded-sm bg-slate-100">
+        <div className="absolute inset-y-0 w-px bg-slate-500" style={{ left: '50%' }} aria-hidden />
+        <div className="absolute inset-y-0" style={{ left: pct >= 0 ? '50%' : `${50 - w}%`, width: `${w}%`, background: colour }} />
+        <div className="absolute inset-y-[-2px] w-px bg-slate-300" style={{ left: `${50 + (tol / span) * 50}%` }} aria-hidden />
+        <div className="absolute inset-y-[-2px] w-px bg-slate-300" style={{ left: `${50 - (tol / span) * 50}%` }} aria-hidden />
+      </div>
+    </div>
+  );
+}
+
+function DriftView({ items, byCell, scenarioId, scenarioName, navigate, initialCls }: { items: DriftItem[]; byCell: ReturnType<typeof reconcile>['byCell']; scenarioId?: string; scenarioName?: string; navigate: (t: NavTarget) => void; initialCls?: DriftClass }) {
   const { update, state, editScenarioById, notify } = useHub();
-  const [cls, setCls] = useState<DriftClass | 'issues'>('issues');
+  const [cls, setCls] = useState<DriftClass | 'issues'>(initialCls ?? 'issues');
+  const [openOnly, setOpenOnly] = useState(false);
+  const tol = state.settings.drift;
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const actor = governanceOf(state).currentUser;
-  const rows = items.filter((i) => (cls === 'issues' ? i.cls !== 'ALIGNED' : i.cls === cls) && (!q || `${i.cellId} ${i.bomPartId} ${i.description} ${i.docId}`.toLowerCase().includes(q.toLowerCase())));
+  const isOpen = (i: DriftItem) => i.cls !== 'ALIGNED' && i.justification?.status !== 'Approved' && i.justification?.status !== 'Rejected';
+  const rows = items.filter((i) => (cls === 'issues' ? i.cls !== 'ALIGNED' : i.cls === cls) && (!openOnly || isOpen(i)) && (!q || `${i.cellId} ${i.bomPartId} ${i.description} ${i.docId}`.toLowerCase().includes(q.toLowerCase())));
   const justify = (it: DriftItem, status: 'Proposed' | 'Approved' | 'Rejected') => {
     const j = { note: note || it.justification?.note || '', status, by: actor };
     if (scenarioId) {
@@ -132,6 +160,9 @@ function DriftView({ items, byCell, scenarioId, scenarioName, navigate }: { item
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Pills value={cls} onChange={setCls} options={[{ value: 'issues' as const, label: 'All drifts & deviations', count: items.filter((i) => i.cls !== 'ALIGNED').length }, ...DRIFT_CLASSES.map((c) => ({ value: c, label: c, count: items.filter((i) => i.cls === c).length }))]} />
           <input className={`${input} w-56`} placeholder="Search cell / part / op / document" value={q} onChange={(e) => setQ(e.target.value)} />
+          <label className="flex items-center gap-1.5 text-xs text-slate-700" title="Hide drifts that already carry an Approved or Rejected engineering decision.">
+            <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Show only open / unapproved items ({items.filter(isOpen).length})
+          </label>
         </div>
         {!rows.length ? <Empty>No steps in this class.</Empty> : (
           <div className="max-h-[560px] overflow-auto scroll-thin">
@@ -150,8 +181,8 @@ function DriftView({ items, byCell, scenarioId, scenarioName, navigate }: { item
                       <td className={td}><span className="font-mono text-[11px]">{i.cellId}</span><div className="font-mono text-[10px] text-slate-500">{i.bomPartId}</div></td>
                       <td className={`${td} whitespace-nowrap text-[11px]`}>{i.docId} {i.revision}<div>Op {i.opNo}</div></td>
                       <td className={`${td} text-[11px]`}>{i.description}{i.std?.mandatory && <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">MANDATORY</span>}</td>
-                      <td className={tdNum}>{i.std ? i.std.stdSetupMin.toFixed(1) : '—'} → {i.work ? i.work.setupMin.toFixed(1) : '—'}<div className="text-[10px] text-slate-500">{i.std && i.work ? pctTxt(i.dSetupPct) : ''}</div></td>
-                      <td className={tdNum}>{i.std ? i.std.stdCycleMin.toFixed(2) : '—'} → {i.work ? i.work.cycleMin.toFixed(2) : '—'}<div className="text-[10px] text-slate-500">{i.std && i.work ? pctTxt(i.dCyclePct) : ''}</div></td>
+                      <td className={tdNum}>{i.std ? i.std.stdSetupMin.toFixed(1) : '—'} → {i.work ? i.work.setupMin.toFixed(1) : '—'}<div className="text-[10px] text-slate-500">{i.std && i.work ? pctTxt(i.dSetupPct) : ''}</div>{i.std && i.work && <VarianceBar pct={i.dSetupPct} tol={tol.setupTolerancePct} comp={tol.complianceTolerancePct} what="Working setup" />}</td>
+                      <td className={tdNum}>{i.std ? i.std.stdCycleMin.toFixed(2) : '—'} → {i.work ? i.work.cycleMin.toFixed(2) : '—'}<div className="text-[10px] text-slate-500">{i.std && i.work ? pctTxt(i.dCyclePct) : ''}</div>{i.std && i.work && <VarianceBar pct={i.dCyclePct} tol={tol.cycleTolerancePct} comp={tol.complianceTolerancePct} what="Working cycle" />}</td>
                       <td className={`${td} min-w-[220px] text-[11px]`}>{i.reasons.join('; ') || 'Within tolerance'}</td>
                       <td className={`${td} min-w-[180px] text-[11px]`}>
                         {i.justification ? (
