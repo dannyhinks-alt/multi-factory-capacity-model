@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { STAT_HINTS } from '../engine/glossary';
 import type { FactoryId } from '../engine/types';
 import { FACTORIES } from '../engine/types';
 
@@ -41,12 +42,22 @@ export function Card({ title, subtitle, actions, children, className = '' }: { t
   );
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'good' | 'warning' | 'critical' }) {
+/** Small “i” marker whose hover / focus shows a plain-English one-sentence explanation. */
+export function Hint({ text }: { text: string }) {
+  return (
+    <span tabIndex={0} title={text} aria-label={text} className="ml-1 inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-slate-300 text-[9px] font-semibold normal-case text-slate-500 hover:bg-slate-100">
+      i
+    </span>
+  );
+}
+
+export function Stat({ label, value, sub, tone, hint: hintProp }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'good' | 'warning' | 'critical'; hint?: string }) {
+  const hint = hintProp ?? STAT_HINTS[label];
   const bar = tone ? STATUS[tone === 'warning' ? 'warning' : tone] : undefined;
   return (
-    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm" title={hint}>
       {bar && <span className="absolute inset-y-0 left-0 w-1" style={{ background: bar }} aria-hidden />}
-      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}{hint && <Hint text={hint} />}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-500">{sub}</div>}
     </div>
@@ -119,13 +130,14 @@ export function Pills<T extends string>({ options, value, onChange, label }: { o
   );
 }
 
-export function FactoryFilter({ value, onChange }: { value: FactoryId | 'All'; onChange: (v: FactoryId | 'All') => void }) {
+/** Factory filter pills — only active factories are offered (Active Factory Switch). */
+export function FactoryFilter({ value, onChange, factories = FACTORIES }: { value: FactoryId | 'All'; onChange: (v: FactoryId | 'All') => void; factories?: FactoryId[] }) {
   return (
     <Pills
       label="Factory filter"
       value={value}
       onChange={onChange}
-      options={[{ value: 'All' as const, label: 'All Plants' }, ...FACTORIES.map((f) => ({ value: f, label: f }))]}
+      options={[{ value: 'All' as const, label: factories.length < FACTORIES.length ? `All Active (${factories.length})` : 'All Plants' }, ...factories.map((f) => ({ value: f, label: f }))]}
     />
   );
 }

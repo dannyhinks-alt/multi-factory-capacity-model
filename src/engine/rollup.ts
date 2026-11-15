@@ -37,6 +37,15 @@ export interface RouteMacroBlock {
   bottleneckAssetId: string | null;
   totalWorkContentMin: number;
   labourContentMin: number;
+  /** Operator-attended minutes per unit (labour minutes, or the full cycle for manual ops). */
+  touchMinPerUnit: number;
+  /** Unattended machine minutes per unit (cycle beyond the operator's labour minutes). */
+  walkAwayMinPerUnit: number;
+  /**
+   * Total Route Lead Time per transfer batch (min) = Σ setup + batch × Σ (touch + walk-away).
+   * Used by Plant Simulation for realistic batch transit delay alongside the Bottleneck Cycle (rate).
+   */
+  routeLeadTimeMin: number;
   effectiveOeePct: number;
   machineCapUnits: number;
   labourCapUnits: number;
@@ -202,6 +211,8 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
   let setup = 0;
   let work = 0;
   let labour = 0;
+  let touch = 0;
+  let walkAway = 0;
   let va = 0;
   let nva = 0;
   let enva = 0;
@@ -215,6 +226,9 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
     }
     const lab = (op.labourMin ?? op.cycleMin) + op.setupMin / batch;
     labour += op.labourMin ?? op.cycleMin;
+    const t = Math.max(0, op.labourMin ?? op.cycleMin);
+    touch += t;
+    walkAway += Math.max(0, op.cycleMin - t);
     if (op.skillId) skillLoad[op.skillId] = (skillLoad[op.skillId] ?? 0) + lab;
     if (op.toolingId) toolingLoad[op.toolingId] = (toolingLoad[op.toolingId] ?? 0) + op.cycleMin;
     if (op.vaType === 'VA') va += op.cycleMin;
@@ -278,6 +292,9 @@ export function foldRoute(route: CellPassport['routes'][number], ctx: RollupCont
     bottleneckAssetId: bottleneckAsset,
     totalWorkContentMin: work,
     labourContentMin: labour,
+    touchMinPerUnit: touch,
+    walkAwayMinPerUnit: walkAway,
+    routeLeadTimeMin: setup + batch * (touch + walkAway),
     effectiveOeePct: oeeWeight > 0 ? (oeeWeighted / oeeWeight) * 100 : ctx.settings.complexityPct.C,
     machineCapUnits: fin(machineCap),
     labourCapUnits: fin(labourCap),

@@ -11,6 +11,10 @@ import DesExport from './workspaces/DesExport';
 import ScenarioPlanner from './workspaces/ScenarioPlanner';
 import FixedProcess from './workspaces/FixedProcess';
 import EcrRelease from './workspaces/EcrRelease';
+import FloorPlan from './workspaces/FloorPlan';
+import { QuickFind } from './components/QuickFind';
+import { ProjectFileControl } from './components/ProjectFile';
+import { fileStatusLabel } from './store/projectFile';
 import { buildSeedState } from './data/seed';
 import { APP_VERSION_LABEL } from './engine/version';
 import { GovernancePanel, IntegrityPanel, VersionBadge } from './components/Governance';
@@ -27,7 +31,7 @@ export type { NavTarget, ViewMode } from './engine/navigation';
 export { PHASES, EXECUTIVE_VIEWS, phasesFor, resolveNav } from './engine/navigation';
 
 export default function App() {
-  const { ready, backend, savedAt, snapshots, state, replaceState, snapshotNow, resetToBaseline, notify, registerNavigator } = useHub();
+  const { ready, backend, savedAt, snapshots, state, replaceState, snapshotNow, resetToBaseline, notify, registerNavigator, fileStatus } = useHub();
   const [view, setView] = useState<ViewId>(() => {
     try {
       const v = localStorage.getItem('mfh:view') as ViewId;
@@ -113,15 +117,17 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex flex-wrap items-center gap-2 text-slate-900">
+            <QuickFind navigate={navigate} />
             <div className="inline-flex overflow-hidden rounded-md border border-slate-600 text-xs" role="group" aria-label="View mode">
               {(['executive', 'engineering'] as const).map((m) => (
-                <button key={m} onClick={() => changeMode(m)} className={`px-2.5 py-1.5 font-medium ${mode === m ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`} title={m === 'executive' ? 'Control Hub, IDEF0 map, Scenario Planner and Validation / ECR outputs' : 'All 15 views'}>
+                <button key={m} onClick={() => changeMode(m)} className={`px-2.5 py-1.5 font-medium ${mode === m ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`} title={m === 'executive' ? 'Control Hub, IDEF0 map, Scenario Planner and Validation / ECR outputs' : `All ${ALL_VIEWS.length} views`}>
                   {m === 'executive' ? 'Executive View' : 'Full Engineering'}
                 </button>
               ))}
             </div>
             <Button variant="primary" onClick={() => setShowImport(true)} title="Drop any file — the hub detects its type and opens the matching import">⬆ Smart Import</Button>
             <VersionBadge onClick={() => navigate({ ws: 'governance' })} />
+            <ProjectFileControl />
             <Button onClick={() => download(`multi-factory-hub-backup-${new Date().toISOString().slice(0, 10)}.json`, backupJson(state), 'application/json')} title="1-click full-plant JSON backup">
               ⬇ Backup
             </Button>
@@ -167,7 +173,7 @@ export default function App() {
             </button>
           ))}
           <span className="ml-auto hidden text-[11px] text-slate-500 md:inline">
-            {mode === 'executive' ? 'Executive View' : 'Full Engineering'} · Phase {phase} · {current?.hint} · {backend === 'indexeddb' ? 'IndexedDB' : backend === 'localstorage' ? 'localStorage' : backend} · {savedAt ? `saved ${new Date(savedAt).toLocaleTimeString('en-GB')}` : ready ? 'not yet saved' : 'loading…'}
+            {mode === 'executive' ? 'Executive View' : 'Full Engineering'} · Phase {phase} · {current?.hint} · {fileStatus.mode === 'browser' ? `Browser storage only (${backend === 'indexeddb' ? 'IndexedDB' : backend === 'localstorage' ? 'localStorage' : backend})` : fileStatusLabel(fileStatus)} · {savedAt ? `saved ${new Date(savedAt).toLocaleTimeString('en-GB')}` : ready ? 'not yet saved' : 'loading…'}
           </span>
         </nav>
       </header>
@@ -184,6 +190,7 @@ export default function App() {
         {view === 'master' && <MasterData key={focusTab ?? 'default'} mode="catalogues" initialTab={focusTab} />}
         {view === 'stores' && <StoresPanel />}
         {view === 'cells' && <CellsExplorer focusCell={focusCell} />}
+        {view === 'layout' && <FloorPlan navigate={navigate} />}
         {view === 'services' && <ServicesSpecifier />}
         {view === 'scenarios' && <ScenarioPlanner navigate={navigate} />}
         {view === 'des' && <DesExport navigate={navigate} />}

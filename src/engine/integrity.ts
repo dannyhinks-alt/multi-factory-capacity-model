@@ -5,12 +5,28 @@
  */
 import type { HubModel } from './model';
 import { MAX_OPS_PER_ROUTE } from './rollup';
-import { SERVICE_KEYS, SERVICE_LABELS } from './settings';
+import { activeFactoryList, SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { HubState } from './types';
 import { FACTORIES } from './types';
 
-export type IntegrityLink = 'Fixed Process' | 'BOM' | 'BOM ↔ Cell Routes' | 'Cell Routes ↔ Micro/Macro Ops' | 'Ops ↔ Master Data & Skills' | 'Buffers / Stores' | 'Facility Services';
-export const INTEGRITY_LINKS: IntegrityLink[] = ['Fixed Process', 'BOM', 'BOM ↔ Cell Routes', 'Cell Routes ↔ Micro/Macro Ops', 'Ops ↔ Master Data & Skills', 'Buffers / Stores', 'Facility Services'];
+export type IntegrityLink = 'Fixed Process' | 'BOM' | 'BOM ↔ Cell Routes' | 'Cell Routes ↔ Micro/Macro Ops' | 'Ops ↔ Master Data & Skills' | 'Asset Ownership & Factories' | 'Buffers / Stores' | 'Facility Services';
+export const INTEGRITY_LINKS: IntegrityLink[] = ['Fixed Process', 'BOM', 'BOM ↔ Cell Routes', 'Cell Routes ↔ Micro/Macro Ops', 'Ops ↔ Master Data & Skills', 'Asset Ownership & Factories', 'Buffers / Stores', 'Facility Services'];
+
+/**
+ * Single-ownership asset governance: every Asset ID may live in exactly one Cell Passport and never
+ * also in Shared Plant — otherwise its CapEx, m² and utility loads would be double-counted.
+ */
+export function assetOwnershipConflicts(state: HubState): string[] {
+  const owners = new Map<string, string[]>();
+  for (const p of state.passports) for (const a of p.assets) owners.set(a.assetId, [...(owners.get(a.assetId) ?? []), p.cellId]);
+  const out: string[] = [];
+  for (const [id, cells] of owners) if (new Set(cells).size > 1) out.push(`${id} held by ${[...new Set(cells)].join(' and ')} (CapEx, m² and utilities double-counted)`);
+  for (const u of state.utilities) for (const sp of u.sharedPlant) {
+    const cells = owners.get(sp.id);
+    if (cells) out.push(`${sp.id} is ${u.factory} Shared Plant and also held by ${[...new Set(cells)].join(', ')} (double-counted)`);
+  }
+  return out;
+}
 
 export interface IntegrityCheck {
   id: string;
@@ -161,6 +177,13 @@ export function checkIntegrity(state: HubState, model: HubModel): IntegrityRepor
   add('md-skill-crew', 'Ops ↔ Master Data & Skills', 'Required skills with no operator in the cell (missing skill link)', 'error', skillNoCrew);
   add('md-skill-catalogue', 'Ops ↔ Master Data & Skills', 'Skills used by ops but absent from the Skills / Roles catalogue', 'warning', [...skillNotCatalogued]);
 
+  // --- Asset Ownership & Factories
+  const active = activeFactoryList(state.settings);
+  add('own-asset', 'Asset Ownership & Factories', 'Asset IDs owned by more than one Cell Passport or by a passport and Shared Plant', 'error', assetOwnershipConflicts(state));
+  add('fac-cells', 'Asset Ownership & Factories', 'Cells still assigned to an inactive factory', 'error', state.passports.filter((p) => !active.includes(p.factory)).map((p) => `${p.cellId} (${p.factory} inactive)`));
+  add('fac-maps', 'Asset Ownership & Factories', 'BOM ↔ Cell Route mappings into an inactive factory', 'error', state.mappings.filter((m) => !active.includes(state.passports.find((p) => p.cellId === m.cellId)?.factory ?? m.factory)).map((m) => `${m.bomPartId} → ${m.cellId} (${state.passports.find((p) => p.cellId === m.cellId)?.factory ?? m.factory})`));
+  add('swc-unknown', 'Asset Ownership & Factories', 'Shared Work Centre designations for cells that do not exist', 'warning', (state.sharedWorkCentres ?? []).filter((id) => !cellIds.has(id)));
+
   // --- Buffers / Stores
   add('st-buffer-cells', 'Buffers / Stores', 'WIP buffers linked to a missing producer / consumer cell', 'error', model.stores.buffers.filter((b) => !cellIds.has(b.producerCellId) || !cellIds.has(b.consumerCellId)).map((b) => b.bufferId));
   add('st-cost', 'Buffers / Stores', 'L5 Raw Material / Bought-Out with no unit cost (working capital understated)', 'warning', [...new Set(state.bom.filter((b) => b.level === 5 && !(b.unitCostGbp && b.unitCostGbp > 0)).map((b) => b.partId))]);
@@ -168,7 +191,7 @@ export function checkIntegrity(state: HubState, model: HubModel): IntegrityRepor
 
   // --- Facility Services
   const svcMissing: string[] = [];
-  for (const f of FACTORIES) {
+  for (const f of FACTORIES.filter((x) => active.includes(x))) {
     const u = state.utilities.find((x) => x.factory === f);
     if (!u) {
       if (state.passports.some((p) => p.factory === f)) svcMissing.push(`${f}: no utility capacity record`);

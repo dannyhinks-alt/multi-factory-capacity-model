@@ -43,6 +43,7 @@ import { SERVICE_KEYS, SERVICE_LABELS } from '../engine/settings';
 import type { FactoryId } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES, QUARTERS } from '../engine/types';
 import { useHub } from '../store/HubContext';
+import { ActiveFactoryToggles } from '../components/ActiveFactories';
 import { statusBadgeTone } from '../components/Governance';
 import { canPromote } from '../engine/governance';
 
@@ -205,6 +206,7 @@ function deltaText(unit: string, key: string, d: number): string {
   if (unit === '%') return `${sign}${a.toFixed(1)} pp`;
   if (unit === 'm²') return `${sign}${fmtNum(a)} m²`;
   if (unit === 'yrs') return `${sign}${a.toFixed(1)} yrs`;
+  if (unit === 'km/yr' || unit === 'h/yr') return `${sign}${fmtNum(a)} ${unit.split('/')[0]}`;
   return `${sign}${fmtNum(a)}`;
 }
 
@@ -369,6 +371,12 @@ function TopologyPanel({ sc, ev, base }: { sc: Scenario; ev: ScenarioEvaluation;
   };
   return (
     <>
+      <Card title="Factory network (Active Factory Switch)" subtitle="Test a 2-, 3- or 4-plant network in this scenario: switched-off plants leave every KPI, footprint, utility and stores total — relocate their cells to keep demand supplied.">
+        <ActiveFactoryToggles value={sc.state.settings.activeFactories} onChange={(next, f) => editScenarioById(sc.id, (d) => { d.settings = { ...d.settings, activeFactories: next }; return `${f} switched ${next[f] ? 'on' : 'off'} (Active Factory Switch)`; })} />
+        {FACTORIES.some((f) => sc.state.settings.activeFactories?.[f] === false) && (
+          <p className="mt-2 text-[11px] text-amber-800">{sc.state.passports.filter((x) => sc.state.settings.activeFactories?.[x.factory] === false).length} cells are still assigned to inactive plants — use Move (relocate) below.</p>
+        )}
+      </Card>
       <Card title="Topology & layout operation" subtitle="Move, clone (replicate), merge or decommission whole cells across F1–F4. Footprint, utilities and CapEx re-calculate instantly.">
         <div className="flex flex-wrap items-end gap-3 text-xs">
           <label className="space-y-1"><div className="text-slate-500">Cell</div><CellSelect sc={sc} value={cellId} onChange={setCellId} /></label>

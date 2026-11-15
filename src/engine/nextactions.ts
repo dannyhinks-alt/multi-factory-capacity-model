@@ -5,7 +5,8 @@
  */
 import type { DriftReport } from './fixedprocess';
 import { governanceOf, versionLabel } from './governance';
-import type { IntegrityReport } from './integrity';
+import { assetOwnershipConflicts, type IntegrityReport } from './integrity';
+import { QUEUE_RISK_LABEL, sharedWorkCentreStatus } from './sharedwc';
 import { autoMatch, rankCandidates } from './mapping';
 import { cellDataQuality } from './aliases';
 import { factoryKpis, type HubModel } from './model';
@@ -96,9 +97,19 @@ export function computeNextActions(state: HubState, model: HubModel, drift: Drif
   if (blocked.length) out.push({ id: 'blocked', severity: 'critical', title: `${blocked.length} gate-blocked cell${blocked.length > 1 ? 's' : ''}`, detail: blocked.map((c) => `${c.cellId}: ${c.gateIssues.find((g) => g.severity === 'BLOCKED')?.message ?? 'blocked'}`).slice(0, 2).join(' · '), count: blocked.length, view: 'cells', cellId: blocked[0].cellId });
   const bn = model.cells.filter((c) => c.status === 'Bottleneck' && c.gateStatus !== 'BLOCKED').sort((x, y) => y.utilisationPct - x.utilisationPct);
   if (bn.length) out.push({ id: 'bottlenecks', severity: 'warning', title: `${bn.length} bottleneck cell${bn.length > 1 ? 's' : ''} above ${state.settings.bottleneckPct}%`, detail: bn.slice(0, 3).map((c) => `${c.cellId} ${Number.isFinite(c.utilisationPct) ? c.utilisationPct.toFixed(0) : '∞'}% (${c.bindingConstraint})`).join(' · ') + ' — try the What-If solver or a Scenario', count: bn.length, view: 'cells', cellId: bn[0].cellId });
-  const red = model.services.flatMap((s) => s.rows.filter((r) => r.rag === 'Red').map((r) => `${s.factory} ${r.key}`));
+  // Active Factory Switch: anything still assigned to a switched-off plant.
+  const inactive = FACTORIES.filter((f) => !model.activeFactories.includes(f));
+  const stranded = state.passports.filter((p) => inactive.includes(p.factory));
+  if (stranded.length) out.push({ id: 'inactive-factory', severity: 'critical', title: `${stranded.length} cell${stranded.length > 1 ? 's' : ''} still in inactive ${inactive.join(', ')}`, detail: `${stranded.slice(0, 3).map((p) => p.cellId).join(', ')} — relocate them (Static Scenario Planner) or switch the factory back on; their demand is excluded from plant KPIs`, count: stranded.length, view: 'scenarios', secondary: { label: 'Active factories', view: 'master', tab: 'dictionary' } });
+  // Single-ownership asset governance.
+  const owners = assetOwnershipConflicts(state);
+  if (owners.length) out.push({ id: 'asset-ownership', severity: 'critical', title: `${owners.length} asset${owners.length > 1 ? 's' : ''} owned twice`, detail: `${owners[0]} — keep each Asset ID in one Cell Passport or Shared Plant only`, count: owners.length, view: 'integrity' });
+  // Shared Work Centre queue-contention risk (static model cannot see queues).
+  const risky = sharedWorkCentreStatus(state, model).filter((x) => x.risk && model.activeFactories.includes(x.factory));
+  if (risky.length) out.push({ id: 'shared-wc', severity: 'warning', title: `${risky.length} Shared Work Centre${risky.length > 1 ? 's' : ''}: ${QUEUE_RISK_LABEL}`, detail: risky.slice(0, 2).map((x) => `${x.cellId} ${x.reasons.join(', ')}`).join(' · '), count: risky.length, view: 'des', secondary: { label: 'Cells & Macro-Routing', view: 'cells' } });
+  const red = model.services.filter((s) => model.activeFactories.includes(s.factory)).flatMap((s) => s.rows.filter((r) => r.rag === 'Red').map((r) => `${s.factory} ${r.key}`));
   if (red.length) out.push({ id: 'utility', severity: 'warning', title: `${red.length} utility overrun${red.length > 1 ? 's' : ''} (Red)`, detail: `${red.slice(0, 3).join(', ')} exceed the plant ceiling`, count: red.length, view: 'services' });
-  const space = FACTORIES.filter((f) => {
+  const space = model.activeFactories.filter((f) => {
     const ceiling = state.utilities.find((u) => u.factory === f)?.floorAreaM2 ?? 0;
     return ceiling > 0 && factoryKpis(model, state, f).totalFootprintM2 > ceiling;
   });

@@ -76,9 +76,9 @@ describe('Guided Next Actions', () => {
 });
 
 describe('Executive vs Full Engineering navigation', () => {
-  it('Full Engineering shows all 15 views across 4 phases', () => {
+  it('Full Engineering shows all 16 views across 4 phases', () => {
     expect(phasesFor('engineering')).toHaveLength(4);
-    expect(phasesFor('engineering').flatMap((p) => p.views)).toHaveLength(15);
+    expect(phasesFor('engineering').flatMap((p) => p.views)).toHaveLength(16);
   });
   it('Executive View keeps Control Hub, IDEF0 map, Scenario Planner and Validation / ECR outputs', () => {
     const v = phasesFor('executive').flatMap((p) => p.views.map((x) => x.id));

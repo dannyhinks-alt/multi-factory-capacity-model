@@ -1,4 +1,5 @@
-import type { ComplexityClass, Dictionary, ServiceVector } from './types';
+import type { ComplexityClass, Dictionary, FactoryId, ServiceVector } from './types';
+import { FACTORIES } from './types';
 
 /**
  * Safe Dictionary defaults used by every calculation and by the Smart Legacy Workbook Importer.
@@ -37,7 +38,27 @@ export const DEFAULT_DICTIONARY: Dictionary = {
   drift: { cycleTolerancePct: 5, setupTolerancePct: 10, complianceTolerancePct: 25 },
   plantSim: { shiftStarts: ['06:00', '14:00', '22:00'], breakMin: 30 },
   requireApprovalForPromotion: false,
+  activeFactories: { F1: true, F2: true, F3: true, F4: true },
+  interPlantKm: { 'F1-F2': 3.5, 'F1-F3': 12, 'F1-F4': 6, 'F2-F3': 9, 'F2-F4': 4.5, 'F3-F4': 8 },
+  flow: { unitsPerPallet: 20, handlingMinPerMove: 4, internalSpeedKmh: 5, truckSpeedKmh: 40, palletsPerTruck: 22, truckHandlingMinPerPallet: 3, autoGridAisleM: 4 },
+  sharedWc: { feederThreshold: 3, utilisationRiskPct: 75 },
 };
+
+/** Factories switched on in the Dictionary (Active Factory Switch). Always returns at least one plant. */
+export function activeFactoryList(settings: Dictionary): FactoryId[] {
+  const on = FACTORIES.filter((f) => settings.activeFactories?.[f] !== false);
+  return on.length ? on : [...FACTORIES];
+}
+
+/** True when a factory is active (missing setting → active). */
+export const isFactoryActive = (settings: Dictionary, f: FactoryId) => activeFactoryList(settings).includes(f);
+
+/** Inter-plant road distance (km), symmetric; 0 within a plant. */
+export function interPlantKm(settings: Dictionary, a: FactoryId, b: FactoryId): number {
+  if (a === b) return 0;
+  const k = a < b ? `${a}-${b}` : `${b}-${a}`;
+  return Math.max(0, settings.interPlantKm?.[k] ?? 0);
+}
 
 export const COMPLEXITY_CLASSES: ComplexityClass[] = ['A', 'B', 'C', 'D', 'E'];
 

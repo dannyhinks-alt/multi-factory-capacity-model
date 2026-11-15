@@ -12,7 +12,7 @@ import type { HubState } from './types';
 export type ViewId =
   | 'hub' | 'systemmap' | 'integrity' | 'governance'
   | 'fixed' | 'passports' | 'bom' | 'master' | 'stores'
-  | 'cells' | 'services' | 'scenarios'
+  | 'cells' | 'layout' | 'services' | 'scenarios'
   | 'des' | 'ecr' | 'specs';
 
 export type NodeTone = 'good' | 'warning' | 'critical' | 'info' | 'neutral';

@@ -1,3 +1,4 @@
+import { ArchitectureCard } from './ArchitectureCard';
 import { useMemo, useState } from 'react';
 import { reconcile } from '../engine/fixedprocess';
 import { checkIntegrity } from '../engine/integrity';
@@ -109,6 +110,7 @@ export function SystemMap({ onNavigate }: { onNavigate: (view: ViewId, tab?: str
   const related = new Set(hover ? map.edges.filter((e) => e.from === hover || e.to === hover).flatMap((e) => [e.from, e.to]) : []);
 
   return (
+    <>
     <Card
       title="IDEF0 / Swimlane System Map — process & data flow"
       subtitle="Inputs → activities under Controls → Outputs, across four swimlanes. Live status on every node; click any node to jump to its workspace."
@@ -197,5 +199,7 @@ export function SystemMap({ onNavigate }: { onNavigate: (view: ViewId, tab?: str
         <span>Badges: ✓ healthy · ! attention · ✕ action required · i information</span>
       </div>
     </Card>
+    <ArchitectureCard />
+    </>
   );
 }

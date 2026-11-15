@@ -2,7 +2,8 @@ import { ancestorsOf, explodeBom, type BomExplosion } from './bom';
 import { demandByRoute, routeKey } from './mapping';
 import { factoryFootprint, rollUpCell, type CellMacroBlock } from './rollup';
 import { computeStores, type StoresModel } from './stores';
-import { addServices, SERVICE_KEYS, ZERO_SERVICES } from './settings';
+import { activeFactoryList, addServices, SERVICE_KEYS, ZERO_SERVICES } from './settings';
+import { computeFlows, type FlowModel } from './flow';
 import type { CellPassport, FactoryId, HubState, RouteMapping, ServiceVector } from './types';
 import { FACTORIES } from './types';
 
@@ -17,9 +18,12 @@ export interface BomLineStatus {
 
 export interface FactoryAudit {
   factory: FactoryId;
+  active: boolean;
   cells: number;
   rawMicroOps: number;
   macroBlocks: number;
+  /** Micro-to-Macro compression ratio (raw micro-ops per folded Macro-Block). */
+  compressionRatio: number;
   routes: number;
   gateBlocked: number;
   gateConditional: number;
@@ -89,12 +93,12 @@ export interface HubModel {
   audit: IngestionAudit;
   services: FactoryServicesBalance[];
   stores: StoresModel;
+  /** Part-flow vectors, floor-plan geometry and travel / handling KPIs. */
+  flows: FlowModel;
+  /** Factories switched on in the Dictionary (Active Factory Switch). */
+  activeFactories: FactoryId[];
 }
 
-/**
- * Build the full derived model from persisted state:
- * BOM explosion → mapped route demand → Cell Macro-Blocks → cascade flags, audit and services balance.
- */
 /**
  * Apply folded Macro-Block overrides by re-scaling the route's micro-ops so the re-fold reproduces
  * the overridden Rolled-Up Setup / Bottleneck Cycle / batch size (micro and macro views stay consistent).
@@ -131,6 +135,11 @@ export function applyMacroOverrides(passports: CellPassport[], overrides: HubSta
   });
 }
 
+/**
+ * Build the full derived model from persisted state:
+ * BOM explosion → mapped route demand → Cell Macro-Blocks → cascade flags, audit, services balance,
+ * Buffers & Stores and the material-flow / floor-plan model.
+ */
 export function computeModel(state: HubState): HubModel {
   const explosion = explodeBom(state.bom, state.schedule);
   const routeDemand = demandByRoute(state.mappings, explosion, state.subcontracts);
@@ -194,13 +203,18 @@ export function computeModel(state: HubState): HubModel {
     const p = state.passports.find((x) => x.cellId === m.cellId);
     return !p || !p.routes.some((r) => r.routeId === m.routeId);
   });
+  const activeFactories = activeFactoryList(state.settings);
   const perFactory: FactoryAudit[] = FACTORIES.map((f) => {
     const fc = cells.filter((c) => c.factory === f);
+    const raw = fc.reduce((s, c) => s + c.rawMicroOps, 0);
+    const blocks = fc.reduce((s, c) => s + c.routes.length, 0);
     return {
       factory: f,
+      active: activeFactories.includes(f),
       cells: fc.length,
-      rawMicroOps: fc.reduce((s, c) => s + c.rawMicroOps, 0),
-      macroBlocks: fc.reduce((s, c) => s + c.routes.length, 0),
+      rawMicroOps: raw,
+      macroBlocks: blocks,
+      compressionRatio: blocks ? raw / blocks : 0,
       routes: fc.reduce((s, c) => s + c.routes.length, 0),
       gateBlocked: fc.filter((c) => c.gateStatus === 'BLOCKED').length,
       gateConditional: fc.filter((c) => c.gateStatus === 'CONDITIONAL').length,
@@ -224,7 +238,9 @@ export function computeModel(state: HubState): HubModel {
 
   const services = FACTORIES.map((f) => servicesBalance(f, cells, state));
   const stores = computeStores(state, explosion, cells);
-  return { explosion, cells, cellById, lineStatus, audit, services, stores };
+  const partial = { explosion, cells, cellById, lineStatus, audit, services, stores, activeFactories } as Omit<HubModel, 'flows'> as HubModel;
+  const flows = computeFlows(state, partial);
+  return { ...partial, flows };
 }
 
 /**
@@ -254,14 +270,15 @@ export function servicesBalance(factory: FactoryId, cells: CellMacroBlock[], sta
  * Utilisation/OEE/TEEP are averaged over cells carrying demand; PCE = VA ÷ (VA + NVA + ENVA) cycle minutes.
  */
 export function factoryKpis(model: HubModel, state: HubState, scope: FactoryId | 'All'): FactoryKpis {
-  const cells = model.cells.filter((c) => scope === 'All' || c.factory === scope);
+  // Active Factory Switch: 'All Plants' covers active factories only (a single plant can still be inspected).
+  const factories = scope === 'All' ? activeFactoryList(state.settings) : [scope];
+  const cells = model.cells.filter((c) => factories.includes(c.factory));
   const active = cells.filter((c) => c.annualDemand > 0);
   const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const sharedPlantCapexGbp = model.services
-    .filter((s) => scope === 'All' || s.factory === scope)
+    .filter((s) => factories.includes(s.factory))
     .reduce((s, f) => s + f.sharedPlantCapexGbp, 0);
   const cellCapexGbp = cells.reduce((s, c) => s + c.totalCapexGbp, 0);
-  const factories = scope === 'All' ? FACTORIES : [scope];
   const factoryFootprintM2 = factories.reduce(
     (s, f) => s + factoryFootprint(cells.filter((c) => c.factory === f).map((c) => c.totalFootprintM2), state.settings),
     0,

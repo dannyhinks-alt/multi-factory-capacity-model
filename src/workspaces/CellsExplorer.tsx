@@ -6,6 +6,68 @@ import { FACTORIES, FACTORY_NAMES } from '../engine/types';
 import { applyLevers, evaluateWhatIf, solveWhatIf, whatIfContext, type WhatIfLevers, type WhatIfResult } from '../engine/whatif';
 import { useHub } from '../store/HubContext';
 import { DataQualityBadge, PunchList, exportNormalised, useDataQuality } from '../components/DataQuality';
+import { FlowLeaderboard } from '../components/FlowLeaderboard';
+import { Hint, STATUS } from '../components/ui';
+import { explain } from '../engine/glossary';
+import { QUEUE_RISK_LABEL, sharedWorkCentreStatus, toggleSharedWc, type SharedWcStatus } from '../engine/sharedwc';
+import { CONSTRAINT_LABEL, bottleneckVerdict, capacityBars } from '../engine/verdict';
+
+/** 3-bar capacity comparison: Machine vs Competent Labour (≥ 2) vs Tooling Dwell against required demand. */
+function CapacityBars({ cell: c }: { cell: CellMacroBlock }) {
+  const { state } = useHub();
+  const bars = capacityBars(c);
+  const finite = bars.map((b) => b.capUnits).filter(Number.isFinite);
+  const max = Math.max(c.annualDemand, ...finite, 1) * 1.08;
+  const hintFor = { Machine: explain('machineCap'), Labour: explain('labourCap'), Tooling: explain('toolingCap') } as const;
+  return (
+    <div className="rounded border border-slate-200 bg-white p-3">
+      <div className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-800">
+        <span>Capacity vs required demand<Hint text={explain('demand')} /></span>
+        <span className="text-[11px] font-normal text-slate-500">units / yr</span>
+      </div>
+      <p className="mb-2 text-xs text-slate-700" data-testid="bottleneck-verdict">{bottleneckVerdict(c, state.settings)}</p>
+      <div className="space-y-1.5">
+        {bars.map((b) => {
+          const v = Number.isFinite(b.capUnits) ? b.capUnits : max;
+          const short = Number.isFinite(b.capUnits) && b.capUnits < c.annualDemand;
+          return (
+            <div key={b.kind} className="grid grid-cols-[150px_1fr_90px] items-center gap-2" title={`${CONSTRAINT_LABEL[b.kind]}: ${Number.isFinite(b.capUnits) ? `${fmtNum(b.capUnits)} units/yr` : 'not used by this cell'} (tightest: ${b.resource}, ${fmtPct(b.utilisationPct)}) — ${hintFor[b.kind]}`}>
+              <span className={`truncate text-[11px] ${b.binding ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>{CONSTRAINT_LABEL[b.kind]}{b.binding ? ' · binding' : ''}</span>
+              <div className="relative h-3 rounded-sm bg-slate-100">
+                <div className="absolute inset-y-0 left-0 rounded-r-[4px]" style={{ width: `${(Math.min(v, max) / max) * 100}%`, background: !Number.isFinite(b.capUnits) ? '#cbd5e1' : short ? STATUS.critical : b.binding ? STATUS.warning : '#2a78d6' }} />
+                {c.annualDemand > 0 && <div className="absolute inset-y-[-3px] w-0.5 bg-slate-900" style={{ left: `${(c.annualDemand / max) * 100}%` }} title={`Required demand ${fmtNum(c.annualDemand)} units/yr`} aria-hidden />}
+              </div>
+              <span className="text-right text-[11px] tabular-nums text-slate-700">{Number.isFinite(b.capUnits) ? fmtNum(b.capUnits) : 'not used'}</span>
+            </div>
+          );
+        })}
+        <div className="grid grid-cols-[150px_1fr_90px] items-center gap-2" title={explain('demand')}>
+          <span className="text-[11px] font-semibold text-slate-900">Required demand</span>
+          <div className="relative h-3"><div className="absolute inset-y-[3px] left-0 h-1.5 rounded-sm bg-slate-900" style={{ width: `${(c.annualDemand / max) * 100}%` }} /></div>
+          <span className="text-right text-[11px] font-semibold tabular-nums text-slate-900">{fmtNum(c.annualDemand)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Shared Work Centre designation toggle + queue-contention risk badge. */
+function SharedWcPanel({ cellId, status }: { cellId: string; status?: SharedWcStatus }) {
+  const { state, update } = useHub();
+  const on = (state.sharedWorkCentres ?? []).includes(cellId);
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-xs">
+      <label className="flex items-center gap-1.5 font-medium text-slate-800" title="A Shared Work Centre is fed by several cells (paint, anodise, CMM, heat treatment…)">
+        <input type="checkbox" checked={on} onChange={(e) => update((s) => ({ ...s, sharedWorkCentres: toggleSharedWc(s.sharedWorkCentres, cellId, e.target.checked) }), `${cellId} ${e.target.checked ? 'designated' : 'removed as'} Shared Work Centre`)} />
+        Shared Work Centre
+      </label>
+      {on && status && (status.risk
+        ? <Badge tone="warning" title={`${explain('sharedWcRisk')} ${status.reasons.join('; ')}`}>{QUEUE_RISK_LABEL}</Badge>
+        : <Badge tone="good" title={explain('sharedWcRisk')}>Static load OK</Badge>)}
+      {on && status && <span className="text-[11px] text-slate-500">{status.feeders.length} feeding cells{status.feeders.length ? `: ${status.feeders.join(', ')}` : ''}</span>}
+    </div>
+  );
+}
 
 /** Per-cell Data Quality Score, source punch-list and 1-click normalised passport export. */
 function CellDataQualityCard({ cellId }: { cellId: string }) {
@@ -52,9 +114,11 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
   };
   const filtered = model.cells.filter(match);
   const s = state.settings;
+  const swc = useMemo(() => new Map(sharedWorkCentreStatus(state, model).map((x) => [x.cellId, x])), [state, model]);
 
   return (
     <>
+      <FlowLeaderboard />
       <Card>
         <div className="flex flex-wrap items-center gap-3">
           <input className={`${input} w-64`} placeholder="Search cell, variant or asset type…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -75,6 +139,7 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
         </div>
       </Card>
       {FACTORIES.map((f) => {
+        const inactive = !model.activeFactories.includes(f);
         const cells = filtered.filter((c) => c.factory === f);
         const all = model.cells.filter((c) => c.factory === f);
         const active = all.filter((c) => c.annualDemand > 0 && Number.isFinite(c.utilisationPct));
@@ -86,6 +151,7 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
               <span className="text-slate-500">{isOpen ? '▾' : '▸'}</span>
               <span className="text-sm font-semibold text-slate-800">{FACTORY_NAMES[f]}</span>
               <span className="text-xs text-slate-500">{cells.length}/{all.length} cells</span>
+              {inactive && <Badge tone="neutral" title={explain('activeFactories')}>Inactive factory — excluded from plant totals</Badge>}
               <span className="ml-auto flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-500">Avg util</span>
                 <Meter pct={avg} near={s.nearLimitPct} limit={s.bottleneckPct} width="w-24" />
@@ -98,7 +164,7 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
               <div className="border-t border-slate-100">
                 {!cells.length && <div className="px-4 py-3 text-xs text-slate-500">No cells match the filter.</div>}
                 {cells.map((c) => (
-                  <CellRow key={c.cellId} cell={c} expanded={selected === c.cellId} onToggle={() => setSelected(selected === c.cellId ? undefined : c.cellId)} />
+                  <CellRow key={c.cellId} cell={c} swc={swc.get(c.cellId)} expanded={selected === c.cellId} onToggle={() => setSelected(selected === c.cellId ? undefined : c.cellId)} />
                 ))}
               </div>
             )}
@@ -109,7 +175,7 @@ export default function CellsExplorer({ focusCell }: { focusCell?: string }) {
   );
 }
 
-function CellRow({ cell: c, expanded, onToggle }: { cell: CellMacroBlock; expanded: boolean; onToggle: () => void }) {
+function CellRow({ cell: c, swc, expanded, onToggle }: { cell: CellMacroBlock; swc?: SharedWcStatus; expanded: boolean; onToggle: () => void }) {
   const { state } = useHub();
   const dq = useDataQuality().get(c.cellId);
   const s = state.settings;
@@ -120,28 +186,31 @@ function CellRow({ cell: c, expanded, onToggle }: { cell: CellMacroBlock; expand
           <div className="font-mono text-[11px] text-slate-500">{c.cellId} · rev {c.revision}</div>
           <div className="text-sm font-medium text-slate-800">{c.cellName}</div>
         </div>
-        <div className="col-span-6 md:col-span-2"><Meter pct={c.utilisationPct} near={s.nearLimitPct} limit={s.bottleneckPct} width="w-20" /></div>
+        <div className="col-span-6 md:col-span-2"><Meter pct={c.utilisationPct} near={s.nearLimitPct} limit={s.bottleneckPct} width="w-20" title={`${fmtPct(c.utilisationPct, 1)} of the binding capacity (MIN of machine, competent labour, tooling dwell) is used by BOM demand`} /></div>
         <div className="col-span-6 md:col-span-2 flex flex-wrap gap-1"><ConstraintTag kind={c.bindingConstraint} /></div>
         <div className="col-span-6 md:col-span-2 flex flex-wrap gap-1">
           <Badge tone={statusTone(c.status)}>{c.status}</Badge>
           {c.gateStatus !== 'PASSED' && <Badge tone={statusTone(c.gateStatus)} title={c.gateIssues.map((g) => g.message).join('; ')}>Gate {c.gateStatus.toLowerCase()}</Badge>}
           {c.overUtility && <Badge tone="serious">Over-utility</Badge>}
           {dq?.needsAction && <DataQualityBadge dq={dq} />}
+          {swc && <Badge tone={swc.risk ? 'warning' : 'info'} title={swc.risk ? `${explain('sharedWcRisk')} ${swc.reasons.join('; ')}` : 'Shared Work Centre — static load within limits'}>{swc.risk ? 'Shared WC · Queue Contention Risk' : 'Shared WC'}</Badge>}
         </div>
         <div className="col-span-3 md:col-span-1 text-right text-xs tabular-nums text-slate-600">{c.routes.length} routes<br />{c.rawMicroOps} ops</div>
         <div className="col-span-3 md:col-span-2 text-right text-xs tabular-nums text-slate-600">{fmtNum(c.annualDemand)} / {fmtNum(c.bindingCapUnits)} u/yr<br />{fmtGbp(c.totalCapexGbp)}</div>
       </button>
-      {expanded && <CellDetail cell={c} />}
+      {expanded && <CellDetail cell={c} swc={swc} />}
     </div>
   );
 }
 
-function CellDetail({ cell: c }: { cell: CellMacroBlock }) {
+function CellDetail({ cell: c, swc }: { cell: CellMacroBlock; swc?: SharedWcStatus }) {
   const { state } = useHub();
   const [view, setView] = useState<'macro' | 'micro'>('macro');
   const passport = state.passports.find((p) => p.cellId === c.cellId)!;
   return (
     <div className="space-y-3 px-4 pb-4">
+      <CapacityBars cell={c} />
+      <SharedWcPanel cellId={c.cellId} status={swc} />
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
         {[
           ['Rolled-up setup', `${fmtNum(c.rolledSetupMin, 1)} min`],

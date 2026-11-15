@@ -652,6 +652,9 @@ export function buildSeedState(): HubState {
     ],
     ingestLog: [{ at: now, kind: 'passport', message: `Baseline: ingested ${passports.length} Cell Passports across F1–F4; ${mappings.length} BOM parts auto-mapped` }],
     updatedAt: now,
+    // Shared Work Centres: the robotic weld cell and finishing lines fed by several machining / fabrication cells.
+    sharedWorkCentres: ['F2-C02', 'F3-C03', 'F3-C04', 'F3-C06'],
+    layouts: {},
   };
   // Baseline DES round-trip so the validation workspace shows AGREE / DISAGREE out of the box.
   const model = computeModel(state);
