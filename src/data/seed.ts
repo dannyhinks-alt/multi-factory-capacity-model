@@ -587,6 +587,41 @@ export function buildSeedState(): HubState {
   const now = '2026-11-01T09:00:00.000Z';
   const mappings = autoMatch([...uniqueParts.values()], passports, [], now).filter((m) => m.bomPartId !== 'CIR-200-IS');
 
+  // ---- Sequential multi-hop (out-and-back) routing: an F1-machined part is hard-anodised in F3 and returns to
+  //      F1 for finish grinding before it is consumed by its parent — Step 1 CELL-E → Step 2 F3-C09 (Anodise Cell 02) → Step 3 CELL-L.
+  //      Every hop route carries the part's own Variant ID: one part number, several sequential cells.
+  const hopPart = passports.find((p) => p.cellId === 'CELL-E')!.routes[0].variantId;
+  const hopDesc = explosion.demandByPart.get(hopPart)!.description;
+  const fam = hopPart.startsWith('ATL') ? 'ATLAS' : hopPart.startsWith('BOR') ? 'BOREAS' : 'CIRRUS';
+  const op = (opNo: number, description: string, cycleMin: number, labourMin: number, skillId: string, vaType: VaType, assetId?: string, setupMin = 0): MicroOp => ({ opNo, description, assetId, setupMin, cycleMin, labourMin, skillId, vaType });
+  const anod = passports.find((p) => p.cellId === 'F3-C09')!;
+  anod.routes.push({
+    routeId: `RT-${hopPart}-S2-ANOD`, variantId: hopPart, productFamily: fam, description: `${hopDesc} — hard anodise (step 2)`, batchSize: 40,
+    ops: [
+      op(210, 'Receive & rack parts from F1', 0.4, 0.4, 'SK-CHEM', 'NVA'),
+      op(220, 'Degrease', 0.3, 0.1, 'SK-GEN', 'ENVA', 'F3-C09-WASH-02', 5),
+      op(230, 'Hard anodise bath', 0.9, 0.15, 'SK-CHEM', 'VA', 'F3-C09-ANOD-01', 20),
+      op(240, 'Seal', 0.3, 0.05, 'SK-CHEM', 'VA', 'F3-C09-ANOD-01'),
+      op(250, 'Unrack & inspect coating', 0.4, 0.4, 'SK-CHEM', 'ENVA'),
+      op(260, 'Pack & despatch back to F1', 0.3, 0.3, 'SK-GEN', 'NVA'),
+    ],
+  });
+  const grind = passports.find((p) => p.cellId === 'CELL-L')!;
+  grind.routes.push({
+    routeId: `RT-${hopPart}-S3-GRIND`, variantId: hopPart, productFamily: fam, description: `${hopDesc} — finish grind after anodise (step 3)`, batchSize: 20,
+    ops: [
+      op(310, 'Load & clamp anodised part', 0.6, 0.6, 'SK-CNC', 'NVA'),
+      op(320, 'Finish grind bearing diameters', 3.2, 0.8, 'SK-CNC', 'VA', 'CELL-L-GRIND-01', 30),
+      op(330, 'CMM final inspection', 1.0, 0.4, 'SK-CMM', 'ENVA', 'CELL-L-CMM-02', 5),
+      op(340, 'Move to despatch buffer', 0.3, 0.3, 'SK-GEN', 'NVA'),
+    ],
+  });
+  for (const m of mappings) if (m.bomPartId === hopPart) m.seq = 1;
+  mappings.push(
+    { bomPartId: hopPart, factory: 'F3', cellId: 'F3-C09', routeId: `RT-${hopPart}-S2-ANOD`, variantId: hopPart, source: 'manual', updatedAt: now, seq: 2 },
+    { bomPartId: hopPart, factory: 'F1', cellId: 'CELL-L', routeId: `RT-${hopPart}-S3-GRIND`, variantId: hopPart, source: 'manual', updatedAt: now, seq: 3 },
+  );
+
   // ---- Factory utilities & shared plant
   const ratios: Record<FactoryId, Record<keyof ServiceVector, number>> = {
     F1: { electricalKw: 0.74, airLpm: 0.68, extractionM3h: 0.55, craneTonnes: 0.5, coolantLpm: 0.71 },
@@ -714,8 +749,10 @@ export function buildSeedFixedProcess(passports: CellPassport[], mappings: { bom
   const done = new Set<string>();
   let cMpi = false;
   for (const m of mappings) {
-    if (done.has(m.bomPartId)) continue;
-    done.add(m.bomPartId);
+    // One document section per part and routing step (multi-hop parts are covered across every hop).
+    const dk = `${m.bomPartId}|${m.cellId}|${m.routeId}`;
+    if (done.has(dk)) continue;
+    done.add(dk);
     const p = passports.find((x) => x.cellId === m.cellId);
     const r = p?.routes.find((x) => x.routeId === m.routeId);
     if (!p || !r) continue;

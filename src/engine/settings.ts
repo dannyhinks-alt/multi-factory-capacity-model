@@ -42,6 +42,9 @@ export const DEFAULT_DICTIONARY: Dictionary = {
   interPlantKm: { 'F1-F2': 3.5, 'F1-F3': 12, 'F1-F4': 6, 'F2-F3': 9, 'F2-F4': 4.5, 'F3-F4': 8 },
   flow: { unitsPerPallet: 20, handlingMinPerMove: 4, internalSpeedKmh: 5, truckSpeedKmh: 40, palletsPerTruck: 22, truckHandlingMinPerPallet: 3, autoGridAisleM: 4 },
   sharedWc: { feederThreshold: 3, utilisationRiskPct: 75 },
+  interPlantCostPerTruckGbp: 180,
+  interPlantTransitDays: 1.0,
+  milkRunsPerWeek: 5,
 };
 
 /** Factories switched on in the Dictionary (Active Factory Switch). Always returns at least one plant. */

@@ -12,6 +12,7 @@
  * despatch dock, by road (editable F1–F4 distances), and from the receiving dock to the consumer.
  */
 import type { HubModel } from './model';
+import { chainsByPart, shareOf } from './mapping';
 import { activeFactoryList, interPlantKm } from './settings';
 import type { FactoryId, FactoryLayout, HubState } from './types';
 import { FACTORIES } from './types';
@@ -51,39 +52,79 @@ export interface FactoryGeometry {
   hasImage: boolean;
 }
 
+/** What a part-flow vector carries. */
+export type FlowKind = 'material' | 'handover' | 'hop' | 'despatch';
+
 /** One weighted part-flow vector between two blocks (possibly in different factories). */
 export interface FlowVector {
   id: string;
   partId: string;
   level: number;
+  kind: FlowKind;
+  /** Routing steps for sequential multi-hop moves (Step `stepFrom` → Step `stepTo` of the same part). */
+  stepFrom?: number;
+  stepTo?: number;
   fromId: string;
   toId: string;
   fromFactory: FactoryId;
   toFactory: FactoryId;
   units: number;
   pallets: number;
-  /** Internal (aisle) metres per one-way trip, both factories combined for cross-factory moves. */
+  /** Internal (aisle) metres per one-way trip: origin leg + destination leg (cross-factory) or the direct leg. */
   internalM: number;
+  /** Origin factory leg (m): Origin Cell → Origin Despatch Dock (or the whole move within one plant). */
+  originLegM: number;
+  /** Destination factory leg (m): Destination Receiving Dock → Destination Cell / Work Centre (0 within a plant). */
+  destLegM: number;
   /** Road km one-way between plants (0 within a plant). */
   roadKm: number;
   internalKmPerYear: number;
+  originKmPerYear: number;
+  destKmPerYear: number;
   roadKmPerYear: number;
+  /** Internal handling hours on the origin / destination leg (pick-up + set-down + driving). */
+  originHandlingHoursPerYear: number;
+  destHandlingHoursPerYear: number;
+  /** Truck loading / unloading + road driving hours (allocated from the lane by pallet share). */
+  roadHandlingHoursPerYear: number;
   handlingHoursPerYear: number;
+  /** Inter-plant logistics £/yr allocated from the lane's truck movements by pallet share. */
+  logisticsCostGbp: number;
   crossFactory: boolean;
+}
+
+/** One directed inter-plant lane (milk run). */
+export interface LogisticsLane {
+  from: FactoryId;
+  to: FactoryId;
+  pallets: number;
+  units: number;
+  /** Scheduled milk runs per year on the lane. */
+  runsPerYear: number;
+  /** Truck movements per year = runs × trucks needed per run (pallets per run ÷ pallets per truck, rounded up). */
+  trucksPerYear: number;
+  roadKm: number;
+  roadKmPerYear: number;
+  costGbp: number;
+  transitDays: number;
 }
 
 export interface FactoryFlowKpi {
   factory: FactoryId;
+  /** Internal travel credited exactly to this plant: its own moves + its exact dock legs of cross-factory moves. */
   intraKmPerYear: number;
   palletMovesPerYear: number;
   handlingHoursPerYear: number;
   /** Intra-factory travel km/yr per 1,000 m² of laid-out floor (higher = more tangled spaghetti). */
   spaghettiIntensity: number;
+  /** Inter-plant logistics £/yr of lanes despatched from this plant (origin pays). */
+  logisticsCostGbp: number;
 }
 
 export interface FlowModel {
   geometry: Record<FactoryId, FactoryGeometry>;
   vectors: FlowVector[];
+  lanes: LogisticsLane[];
   byFactory: FactoryFlowKpi[];
   totals: {
     intraKmPerYear: number;
@@ -92,8 +133,10 @@ export interface FlowModel {
     interPlantKmPerYear: number;
     handlingHoursPerYear: number;
     palletMovesPerYear: number;
+    logisticsCostGbp: number;
+    truckMovesPerYear: number;
   };
-  /** Cells feeding each consuming cell (from cell → cell part-flow vectors). */
+  /** Cells feeding each consuming cell (from cell → cell part-flow vectors, incl. multi-hop steps). */
   feeders: Map<string, Set<string>>;
 }
 
@@ -158,10 +201,19 @@ export function factoryGeometry(state: HubState, model: HubModel, factory: Facto
 export const aisleMetres = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 /**
- * Derive every part-flow vector and its travel, pallet and handling load.
- * - Pallets/yr = units ÷ units-per-pallet; each pallet move is loaded out + empty return (× 2 distance).
- * - Handling hours = pallets × (pick-up/set-down min + internal travel time) + for cross-factory moves
- *   truck loading per pallet + truck trips × road km × 2 ÷ road speed.
+ * Derive every part-flow vector and its travel, pallet, handling and logistics load.
+ *
+ * Vectors follow each part's sequential routing chain (Step 1 → Step 2 → … → parent's Step 1):
+ * - `material`: Goods-In (RM) → Step-1 cells of every made part that consumes bought material;
+ * - `hop`: Step k cells → Step k+1 cells of the same part (multi-hop, incl. out-and-back factory moves);
+ * - `handover`: last-step cells of a child part → Step-1 cells of its parent part;
+ * - `despatch`: last-step cells of an L1 Assembly → Finished Goods & Despatch.
+ *
+ * Travel: pallets/yr = units ÷ parts per pallet; every pallet move is loaded out + empty return (× 2).
+ * Cross-factory moves are attributed exactly: the origin plant is credited with its Origin Cell → Despatch
+ * Dock leg, the destination plant with its Receiving Dock → Destination Cell leg (km, pallet moves, hours).
+ * Road legs run as directed milk-run lanes: trucks/yr = runs/yr × ⌈pallets per run ÷ pallets per truck⌉,
+ * road km = trucks × km × 2, logistics £ = trucks × £ per truck; lane figures are allocated to vectors by pallets.
  */
 export function computeFlows(state: HubState, model: HubModel): FlowModel {
   const fd = state.settings.flow;
@@ -170,43 +222,47 @@ export function computeFlows(state: HubState, model: HubModel): FlowModel {
   for (const f of FACTORIES) for (const b of geometry[f].blocks) blockById.set(b.id, b);
   const cellFactory = new Map(model.cells.map((c) => [c.cellId, c.factory]));
   const sub = new Map((state.subcontracts ?? []).map((s) => [s.bomPartId, Math.min(100, Math.max(0, s.pct)) / 100]));
-  const mapsByPart = new Map<string, { cellId: string; share: number }[]>();
-  for (const m of state.mappings) {
-    if (!cellFactory.has(m.cellId)) continue;
-    mapsByPart.set(m.bomPartId, [...(mapsByPart.get(m.bomPartId) ?? []), { cellId: m.cellId, share: (m.sharePct ?? 100) / 100 }]);
-  }
+  const chains = chainsByPart(state.mappings.filter((m) => cellFactory.has(m.cellId)));
   const inHouse = (partId: string) => 1 - (sub.get(partId) ?? 0);
-  const agg = new Map<string, { partId: string; level: number; from: string; to: string; units: number }>();
-  const add = (partId: string, level: number, from: string, to: string, units: number) => {
+  const agg = new Map<string, { partId: string; level: number; kind: FlowKind; stepFrom?: number; stepTo?: number; from: string; to: string; units: number }>();
+  const add = (partId: string, level: number, kind: FlowKind, from: string, to: string, units: number, stepFrom?: number, stepTo?: number) => {
     if (units <= 0 || from === to) return;
     const k = `${from}>${to}>${partId}`;
-    const cur = agg.get(k) ?? { partId, level, from, to, units: 0 };
+    const cur = agg.get(k) ?? { partId, level, kind, stepFrom, stepTo, from, to, units: 0 };
     cur.units += units;
     agg.set(k, cur);
   };
 
   for (const l of model.explosion.lines) {
     if (l.makeBuy !== 'Make') continue;
-    const producers = mapsByPart.get(l.partId) ?? [];
-    if (!producers.length) continue;
+    const chain = chains.get(l.partId);
+    if (!chain?.length) continue;
+    const first = chain[0];
+    const last = chain[chain.length - 1];
     const made = l.grossAnnual * inHouse(l.partId);
     const children = l.childIds.map((id) => model.explosion.byLineId.get(id)!).filter(Boolean);
-    // Goods-In → producing cell: one blank / kit per made part when the line consumes bought material.
+    // Goods-In → Step-1 cell(s): one blank / kit per made part when the line consumes bought material.
     if (children.some((c) => c.makeBuy === 'Buy')) {
-      for (const p of producers) add(`${l.partId} material`, 5, storeBlockId(cellFactory.get(p.cellId)!, 'RM'), p.cellId, made * p.share);
+      for (const p of first) add(`${l.partId} material`, 5, 'material', storeBlockId(cellFactory.get(p.cellId)!, 'RM'), p.cellId, made * shareOf(p));
     }
-    // Child Make part → this part's producing cell(s).
+    // Sequential multi-hop: Step k → Step k+1 of the same part.
+    for (let k = 0; k < chain.length - 1; k++) {
+      for (const a of chain[k]) for (const b of chain[k + 1]) add(l.partId, l.level, 'hop', a.cellId, b.cellId, made * shareOf(a) * shareOf(b), k + 1, k + 2);
+    }
+    // Child Make part: its last step → this part's Step 1.
     for (const ch of children) {
       if (ch.makeBuy !== 'Make') continue;
-      const chProducers = mapsByPart.get(ch.partId) ?? [];
+      const cc = chains.get(ch.partId);
+      if (!cc?.length) continue;
       const moved = ch.grossAnnual * inHouse(ch.partId) * inHouse(l.partId);
-      for (const cp of chProducers) for (const p of producers) add(ch.partId, ch.level, cp.cellId, p.cellId, moved * cp.share * p.share);
+      for (const cp of cc[cc.length - 1]) for (const p of first) add(ch.partId, ch.level, 'handover', cp.cellId, p.cellId, moved * shareOf(cp) * shareOf(p));
     }
-    // L1 → Finished Goods & Despatch staging in the assembling factory.
-    if (l.level === 1) for (const p of producers) add(l.partId, 1, p.cellId, storeBlockId(cellFactory.get(p.cellId)!, 'FG'), made * p.share);
+    // L1 last step → Finished Goods & Despatch staging in the finishing factory.
+    if (l.level === 1) for (const p of last) add(l.partId, 1, 'despatch', p.cellId, storeBlockId(cellFactory.get(p.cellId)!, 'FG'), made * shareOf(p));
   }
 
   const factoryOfBlock = (id: string): FactoryId | undefined => blockById.get(id)?.factory ?? cellFactory.get(id);
+  const speed = Math.max(0.1, fd.internalSpeedKmh);
   const vectors: FlowVector[] = [];
   const feeders = new Map<string, Set<string>>();
   for (const v of agg.values()) {
@@ -221,75 +277,116 @@ export function computeFlows(state: HubState, model: HubModel): FlowModel {
       feeders.set(v.to, s);
     }
     const cross = fa !== fb;
-    const internalM = cross
-      ? aisleMetres(a, blockById.get(storeBlockId(fa, 'DOCK'))!) + aisleMetres(blockById.get(storeBlockId(fb, 'DOCK'))!, b)
-      : aisleMetres(a, b);
-    const roadKm = cross ? interPlantKm(state.settings, fa, fb) : 0;
+    const originLegM = cross ? aisleMetres(a, blockById.get(storeBlockId(fa, 'DOCK'))!) : aisleMetres(a, b);
+    const destLegM = cross ? aisleMetres(blockById.get(storeBlockId(fb, 'DOCK'))!, b) : 0;
     const pallets = v.units / Math.max(1, fd.unitsPerPallet);
-    const internalKmPerYear = (pallets * internalM * 2) / 1000;
-    const truckTrips = cross ? pallets / Math.max(1, fd.palletsPerTruck) : 0;
-    const roadKmPerYear = truckTrips * roadKm * 2;
-    const handlingHoursPerYear =
-      (pallets * fd.handlingMinPerMove * (cross ? 2 : 1)) / 60 +
-      internalKmPerYear / Math.max(0.1, fd.internalSpeedKmh) +
-      (cross ? (pallets * fd.truckHandlingMinPerPallet) / 60 + roadKmPerYear / Math.max(1, fd.truckSpeedKmh) : 0);
+    const originKmPerYear = (pallets * originLegM * 2) / 1000;
+    const destKmPerYear = (pallets * destLegM * 2) / 1000;
+    const originHandlingHoursPerYear = (pallets * fd.handlingMinPerMove) / 60 + originKmPerYear / speed;
+    const destHandlingHoursPerYear = cross ? (pallets * fd.handlingMinPerMove) / 60 + destKmPerYear / speed : 0;
     vectors.push({
       id: `${v.from}>${v.to}>${v.partId}`,
       partId: v.partId,
       level: v.level,
+      kind: v.kind,
+      stepFrom: v.stepFrom,
+      stepTo: v.stepTo,
       fromId: v.from,
       toId: v.to,
       fromFactory: fa,
       toFactory: fb,
       units: v.units,
       pallets,
-      internalM,
-      roadKm,
-      internalKmPerYear,
-      roadKmPerYear,
-      handlingHoursPerYear,
+      internalM: originLegM + destLegM,
+      originLegM,
+      destLegM,
+      roadKm: cross ? interPlantKm(state.settings, fa, fb) : 0,
+      internalKmPerYear: originKmPerYear + destKmPerYear,
+      originKmPerYear,
+      destKmPerYear,
+      roadKmPerYear: 0,
+      originHandlingHoursPerYear,
+      destHandlingHoursPerYear,
+      roadHandlingHoursPerYear: 0,
+      handlingHoursPerYear: originHandlingHoursPerYear + destHandlingHoursPerYear,
+      logisticsCostGbp: 0,
       crossFactory: cross,
     });
   }
 
+  // Directed milk-run lanes between plants; lane trucks, road km, hours and £ allocated to vectors by pallets.
+  const runsPerYear = Math.max(0, state.settings.milkRunsPerWeek ?? 5) * state.settings.weeksPerYear;
+  const laneMap = new Map<string, FlowVector[]>();
+  for (const v of vectors) if (v.crossFactory) laneMap.set(`${v.fromFactory}>${v.toFactory}`, [...(laneMap.get(`${v.fromFactory}>${v.toFactory}`) ?? []), v]);
+  const lanes: LogisticsLane[] = [];
+  for (const vs of laneMap.values()) {
+    const from = vs[0].fromFactory;
+    const to = vs[0].toFactory;
+    const pallets = vs.reduce((t, v) => t + v.pallets, 0);
+    const perTruck = Math.max(1, fd.palletsPerTruck);
+    const trucksPerYear = runsPerYear > 0 ? runsPerYear * Math.max(1, Math.ceil(pallets / runsPerYear / perTruck - 1e-9)) : Math.ceil(pallets / perTruck);
+    const roadKm = interPlantKm(state.settings, from, to);
+    const roadKmPerYear = trucksPerYear * roadKm * 2;
+    const costGbp = trucksPerYear * Math.max(0, state.settings.interPlantCostPerTruckGbp ?? 0);
+    const roadHours = roadKmPerYear / Math.max(1, fd.truckSpeedKmh) + (pallets * fd.truckHandlingMinPerPallet) / 60;
+    for (const v of vs) {
+      const w = pallets > 0 ? v.pallets / pallets : 0;
+      v.roadKmPerYear = roadKmPerYear * w;
+      v.logisticsCostGbp = costGbp * w;
+      v.roadHandlingHoursPerYear = roadHours * w;
+      v.handlingHoursPerYear += v.roadHandlingHoursPerYear;
+    }
+    lanes.push({ from, to, pallets, units: vs.reduce((t, v) => t + v.units, 0), runsPerYear, trucksPerYear, roadKm, roadKmPerYear, costGbp, transitDays: state.settings.interPlantTransitDays ?? 0 });
+  }
+  lanes.sort((a, b) => b.costGbp - a.costGbp || a.from.localeCompare(b.from));
+
   const active = new Set(activeFactoryList(state.settings));
-  const footprint = (f: FactoryId) => {
-    const g = geometry[f];
-    return g.blocks.reduce((t, b) => t + b.areaM2, 0);
-  };
+  const footprint = (f: FactoryId) => geometry[f].blocks.reduce((t, b) => t + b.areaM2, 0);
   const byFactory: FactoryFlowKpi[] = FACTORIES.map((f) => {
     let km = 0;
     let moves = 0;
     let hours = 0;
     for (const v of vectors) {
-      if (!v.crossFactory && v.fromFactory === f) {
-        km += v.internalKmPerYear;
+      // Exact attribution: each plant is credited with its own leg of every move.
+      if (v.fromFactory === f) {
+        km += v.originKmPerYear;
         moves += v.pallets;
-        hours += v.handlingHoursPerYear;
-      } else if (v.crossFactory && (v.fromFactory === f || v.toFactory === f)) {
-        // Internal legs of cross-factory moves are split between the despatching and receiving plant.
-        km += v.internalKmPerYear / 2;
-        moves += v.pallets / 2;
-        hours += v.handlingHoursPerYear / 2;
+        hours += v.originHandlingHoursPerYear;
+      }
+      if (v.crossFactory && v.toFactory === f) {
+        km += v.destKmPerYear;
+        moves += v.pallets;
+        hours += v.destHandlingHoursPerYear;
       }
     }
     const area = footprint(f);
-    return { factory: f, intraKmPerYear: km, palletMovesPerYear: moves, handlingHoursPerYear: hours, spaghettiIntensity: area > 0 ? km / (area / 1000) : 0 };
+    return {
+      factory: f,
+      intraKmPerYear: km,
+      palletMovesPerYear: moves,
+      handlingHoursPerYear: hours,
+      spaghettiIntensity: area > 0 ? km / (area / 1000) : 0,
+      logisticsCostGbp: lanes.filter((l) => l.from === f).reduce((t, l) => t + l.costGbp, 0),
+    };
   });
-  const inScope = (v: FlowVector) => active.has(v.fromFactory) && active.has(v.toFactory);
+  const inScope = (v: { fromFactory: FactoryId; toFactory: FactoryId }) => active.has(v.fromFactory) && active.has(v.toFactory);
   const sv = vectors.filter(inScope);
   const cross = sv.filter((v) => v.crossFactory);
+  const sl = lanes.filter((l) => active.has(l.from) && active.has(l.to));
   return {
     geometry,
     vectors,
+    lanes,
     byFactory,
     totals: {
       intraKmPerYear: sv.reduce((t, v) => t + v.internalKmPerYear, 0),
       crossFactoryUnits: cross.reduce((t, v) => t + v.units, 0),
       crossFactoryPallets: cross.reduce((t, v) => t + v.pallets, 0),
-      interPlantKmPerYear: cross.reduce((t, v) => t + v.roadKmPerYear, 0),
+      interPlantKmPerYear: sl.reduce((t, l) => t + l.roadKmPerYear, 0),
       handlingHoursPerYear: sv.reduce((t, v) => t + v.handlingHoursPerYear, 0),
-      palletMovesPerYear: sv.reduce((t, v) => t + v.pallets, 0),
+      palletMovesPerYear: sv.reduce((t, v) => t + v.pallets * (v.crossFactory ? 2 : 1), 0),
+      logisticsCostGbp: sl.reduce((t, l) => t + l.costGbp, 0),
+      truckMovesPerYear: sl.reduce((t, l) => t + l.trucksPerYear, 0),
     },
     feeders,
   };

@@ -1,5 +1,6 @@
 import type { HubModel } from './model';
-import type { DesResult, Dictionary, HubState } from './types';
+import type { DesResult, Dictionary, HubState, RouteMapping } from './types';
+import { chainsByPart } from './mapping';
 import { parseCsv, parseJsonText } from './csv';
 
 /** One flat row of the Plant Simulation / DES routing & schedule table (one folded macro-operation). */
@@ -29,6 +30,9 @@ export interface DesRoutingRow extends Record<string, unknown> {
   touchMinPerUnit: number;
   walkAwayMinPerUnit: number;
   sharedWorkCentre: boolean;
+  /** Sequential routing step of this route for its BOM part(s) (1 for single-cell parts) and the chain length. */
+  routingStep: number;
+  routingSteps: number;
   demandAnnual: number;
   demandQ1: number;
   demandQ2: number;
@@ -52,8 +56,17 @@ export interface DesScheduleRow extends Record<string, unknown> {
  * Build the flat DES routing table from the folded Macro-Operations.
  * Each passport route becomes exactly one simulation block (thousands of micro-steps collapse to ~1 row per route).
  */
-export function buildDesRouting(model: HubModel, sharedWorkCentres: string[] = []): DesRoutingRow[] {
+export function buildDesRouting(model: HubModel, sharedWorkCentres: string[] = [], mappings: RouteMapping[] = []): DesRoutingRow[] {
   const shared = new Set(sharedWorkCentres);
+  const chains = chainsByPart(mappings);
+  const stepFor = (cellId: string, routeId: string, parts: string[]) => {
+    for (const p of parts) {
+      const c = chains.get(p);
+      const i = c?.findIndex((st) => st.some((m) => m.cellId === cellId && m.routeId === routeId)) ?? -1;
+      if (c && i >= 0) return { step: i + 1, steps: c.length };
+    }
+    return { step: 1, steps: 1 };
+  };
   const rows: DesRoutingRow[] = [];
   for (const c of model.cells) {
     c.routes.forEach((r, i) => {
@@ -84,6 +97,8 @@ export function buildDesRouting(model: HubModel, sharedWorkCentres: string[] = [
         touchMinPerUnit: r.touchMinPerUnit,
         walkAwayMinPerUnit: r.walkAwayMinPerUnit,
         sharedWorkCentre: shared.has(c.cellId),
+        routingStep: stepFor(c.cellId, r.routeId, r.demand.bomParts).step,
+        routingSteps: stepFor(c.cellId, r.routeId, r.demand.bomParts).steps,
         demandAnnual: r.demand.annual,
         demandQ1: r.demand.byQuarter.Q1,
         demandQ2: r.demand.byQuarter.Q2,

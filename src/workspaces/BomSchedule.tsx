@@ -3,7 +3,8 @@ import type { NavTarget } from '../App';
 import { Badge, Button, Card, Pills, download, fmtNum, fmtPct, input, statusTone, td, tdNum, th } from '../components/ui';
 import { resolveSchedule } from '../engine/bom';
 import { toCsv } from '../engine/csv';
-import { autoMatch, rankCandidates } from '../engine/mapping';
+import { addHop, autoMatch, chainsByPart, moveHop, primaryOf, rankCandidates, removeHop, setHop, type HopTarget } from '../engine/mapping';
+import { explain } from '../engine/glossary';
 import type { BomLevel, Quarter, RouteMapping, ScheduleLine } from '../engine/types';
 import { BOM_LEVEL_NAMES, QUARTERS } from '../engine/types';
 import { useHub } from '../store/HubContext';
@@ -136,7 +137,7 @@ function BomTree({ navigate }: { navigate: (t: NavTarget) => void }) {
   const exportCsv = () =>
     download('bom-explosion.csv', toCsv(ex.lines.map((l) => {
       const st = model.lineStatus.get(l.lineId)!;
-      return { lineId: l.lineId, parentLineId: l.parentLineId ?? '', level: `L${l.level}`, partId: l.partId, description: l.description, programme: l.programme, makeBuy: l.makeBuy, qtyPer: l.qtyPer, scrapPct: l.scrapPct, netAnnual: l.netAnnual, grossAnnual: l.grossAnnual, grossQ1: l.grossByQuarter.Q1, grossQ2: l.grossByQuarter.Q2, grossQ3: l.grossByQuarter.Q3, grossQ4: l.grossByQuarter.Q4, cumYieldPct: l.cumYieldPct, cumLeadTimeDays: l.cumLeadTimeDays, criticalPath: l.onCriticalPath ? 'Y' : '', factory: st.mapping?.factory ?? '', cellId: st.mapping?.cellId ?? '', routeId: st.mapping?.routeId ?? '', flag: st.flag ?? '' };
+      return { lineId: l.lineId, parentLineId: l.parentLineId ?? '', level: `L${l.level}`, partId: l.partId, description: l.description, programme: l.programme, makeBuy: l.makeBuy, qtyPer: l.qtyPer, scrapPct: l.scrapPct, netAnnual: l.netAnnual, grossAnnual: l.grossAnnual, grossQ1: l.grossByQuarter.Q1, grossQ2: l.grossByQuarter.Q2, grossQ3: l.grossByQuarter.Q3, grossQ4: l.grossByQuarter.Q4, cumYieldPct: l.cumYieldPct, transitLeadTimeDays: l.transitLeadTimeDays, cumLeadTimeDays: l.cumLeadTimeDays, criticalPath: l.onCriticalPath ? 'Y' : '', factory: st.mapping?.factory ?? '', cellId: st.mapping?.cellId ?? '', routeId: st.mapping?.routeId ?? '', flag: st.flag ?? '' };
     })), 'text/csv');
 
   return (
@@ -202,7 +203,7 @@ function BomTree({ navigate }: { navigate: (t: NavTarget) => void }) {
                   <td className={`${tdNum} font-medium`}>{fmtNum(l.grossAnnual)}</td>
                   {QUARTERS.map((qq) => <td key={qq} className={tdNum}>{fmtNum(l.grossByQuarter[qq])}</td>)}
                   <td className={tdNum}>{fmtPct(l.cumYieldPct, 1)}</td>
-                  <td className={tdNum}>{l.ownLeadTimeDays} / {l.cumLeadTimeDays}</td>
+                  <td className={tdNum} title={l.transitLeadTimeDays ? `Includes ${l.transitLeadTimeDays} day(s) of inter-plant transit — ${explain('transit')}` : undefined}>{l.ownLeadTimeDays}{l.transitLeadTimeDays ? <span className="text-purple-700"> +{l.transitLeadTimeDays}⇄</span> : null} / {l.cumLeadTimeDays}</td>
                   <td className={td}>
                     {st.mapping ? (
                       <button className="font-mono text-[11px] text-blue-700 hover:underline" onClick={() => navigate({ ws: 'cells', cellId: st.mapping!.cellId })}>
@@ -224,26 +225,25 @@ function BomTree({ navigate }: { navigate: (t: NavTarget) => void }) {
 // ---------------------------------------------------------------- BOM ↔ Cell Route Linker
 function RouteLinker() {
   const { model, state, update } = useHub();
-  const [filter, setFilter] = useState<'all' | 'unmapped' | 'manual' | 'auto'>('all');
+  const [filter, setFilter] = useState<'all' | 'unmapped' | 'manual' | 'auto' | 'multi'>('all');
   const [q, setQ] = useState('');
   const parts = useMemo(() => [...model.explosion.demandByPart.entries()].filter(([, d]) => d.makeBuy === 'Make').map(([partId, d]) => ({ partId, ...d })), [model]);
-  const mapBy = new Map(state.mappings.map((m) => [m.bomPartId, m]));
+  const chains = useMemo(() => chainsByPart(state.mappings), [state.mappings]);
+  // Step-1 primary route of each part (the row's editable link); further sequential hops are listed below it.
+  const mapBy = new Map([...chains].map(([part, chain]) => [part, primaryOf(chain[0])]));
   const rows = parts.filter((p) => {
     const m = mapBy.get(p.partId);
     if (filter === 'unmapped' && m) return false;
     if (filter === 'manual' && m?.source !== 'manual') return false;
     if (filter === 'auto' && m?.source !== 'auto') return false;
-    if (q && !`${p.partId} ${p.description} ${m?.cellId ?? ''}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (filter === 'multi' && (chains.get(p.partId)?.length ?? 0) < 2) return false;
+    if (q && !`${p.partId} ${p.description} ${(chains.get(p.partId) ?? []).flat().map((x) => x.cellId).join(' ')}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   }).sort((a, b) => a.level - b.level || a.partId.localeCompare(b.partId));
 
-  const setMapping = (partId: string, m: Omit<RouteMapping, 'bomPartId' | 'updatedAt' | 'source'> | null) =>
-    update((s) => ({
-      ...s,
-      mappings: m
-        ? [...s.mappings.filter((x) => x.bomPartId !== partId), { ...m, bomPartId: partId, source: 'manual', updatedAt: new Date().toISOString() }]
-        : s.mappings.filter((x) => x.bomPartId !== partId),
-    }), 'Route Linker edit');
+  const edit = (fn: (ms: RouteMapping[]) => RouteMapping[], label: string) => update((s) => ({ ...s, mappings: fn(s.mappings) }), label);
+  const setMapping = (partId: string, m: HopTarget | null) =>
+    m ? edit((ms) => setHop(ms, partId, 1, m), 'Route Linker edit') : edit((ms) => ms.filter((x) => x.bomPartId !== partId), 'Route Linker edit');
 
   const runAuto = () =>
     update((s) => {
@@ -257,11 +257,11 @@ function RouteLinker() {
   return (
     <Card
       title="BOM ↔ Cell Route Linker"
-      subtitle="Persistent mapping: BOM Part ID → Factory + Cell ID + Passport Route/Variant. Auto-matched by ID on first upload; saved mappings win thereafter and follow re-ingested passports."
+      subtitle="Persistent mapping: BOM Part ID → Factory + Cell ID + Passport Route/Variant. Auto-matched by ID on first upload; saved mappings win thereafter and follow re-ingested passports. “+ Add hop” routes one part number sequentially through further cells or factories (Step 1 → Step 2 → … → parent)."
       actions={<><Button variant="primary" onClick={runAuto}>Auto-match unmapped</Button><Button onClick={() => download('bom-route-mappings.csv', toCsv(state.mappings), 'text/csv')}>⬇ CSV</Button></>}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Pills value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All', count: parts.length }, { value: 'unmapped', label: 'Unmapped', count: parts.filter((p) => !mapBy.has(p.partId)).length }, { value: 'auto', label: 'Auto' }, { value: 'manual', label: 'Manual' }]} />
+        <Pills value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All', count: parts.length }, { value: 'unmapped', label: 'Unmapped', count: parts.filter((p) => !mapBy.has(p.partId)).length }, { value: 'auto', label: 'Auto' }, { value: 'manual', label: 'Manual' }, { value: 'multi', label: 'Multi-hop', count: [...chains.values()].filter((c) => c.length > 1).length }]} />
         <input className={`${input} w-44`} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="max-h-[520px] overflow-auto scroll-thin">
@@ -280,6 +280,7 @@ function RouteLinker() {
           <tbody>
             {rows.map((p) => {
               const m = mapBy.get(p.partId);
+              const chain = chains.get(p.partId) ?? [];
               const suggestions = !m ? rankCandidates(p.partId, p.description, state.passports).slice(0, 2) : [];
               const passport = m ? state.passports.find((x) => x.cellId === m.cellId) : undefined;
               const stale = m && !passport?.routes.some((r) => r.routeId === m.routeId);
@@ -313,11 +314,61 @@ function RouteLinker() {
                       {m ? (
                         <div className="flex items-center gap-1">
                           <Badge tone={stale ? 'warning' : m.source === 'manual' ? 'info' : 'good'}>{stale ? 'stale' : m.source}</Badge>
-                          <button className="text-[11px] text-slate-400 hover:text-red-600" title="Remove mapping" onClick={() => setMapping(p.partId, null)}>✕</button>
+                          <button className="text-[11px] text-slate-400 hover:text-red-600" title="Remove every routing step of this part" onClick={() => setMapping(p.partId, null)}>✕</button>
+                          <button
+                            className="whitespace-nowrap rounded border border-slate-300 px-1.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                            title={explain('multiHop')}
+                            onClick={() => { const last = primaryOf(chain[chain.length - 1]); edit((ms) => addHop(ms, p.partId, { factory: last.factory, cellId: last.cellId, routeId: last.routeId, variantId: last.variantId }), `Add routing hop to ${p.partId}`); }}
+                          >+ Add hop</button>
                         </div>
                       ) : <Badge tone="warning">Unmapped</Badge>}
                     </td>
                   </tr>
+                  {chain.length > 1 && (
+                    <tr>
+                      <td className={`${td} bg-blue-50/40`} colSpan={7}>
+                        <div className="mb-1 flex flex-wrap items-center gap-1 text-[11px] text-slate-700" title={explain('multiHop')}>
+                          <span className="font-semibold">Multi-hop route:</span>
+                          {chain.map((st, i) => {
+                            const pm = primaryOf(st);
+                            const prev = i ? primaryOf(chain[i - 1]) : undefined;
+                            return (
+                              <span key={i} className="inline-flex items-center gap-1">
+                                {i > 0 && <span className={prev && prev.factory !== pm.factory ? 'font-semibold text-purple-700' : 'text-slate-400'} title={prev && prev.factory !== pm.factory ? `Cross-factory transfer ${prev.factory} → ${pm.factory}: +${state.settings.interPlantTransitDays} day transit` : 'Same factory'}>{prev && prev.factory !== pm.factory ? `⇄ ${prev.factory}→${pm.factory}` : '→'}</span>}
+                                <span className="rounded bg-white px-1 font-mono">S{i + 1} {pm.factory}/{pm.cellId}{st.length > 1 ? ` +${st.length - 1} dual` : ''}</span>
+                              </span>
+                            );
+                          })}
+                          <span className="text-slate-400">→ parent BOM tier</span>
+                        </div>
+                        <div className="space-y-1">
+                          {chain.slice(1).map((st, j) => {
+                            const step = j + 2;
+                            const hm = primaryOf(st);
+                            const hp = state.passports.find((x) => x.cellId === hm.cellId);
+                            return (
+                              <div key={step} className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                <span className="w-12 font-semibold text-slate-700">Step {step}</span>
+                                <select className={input} aria-label={`Step ${step} factory`} value={hm.factory} onChange={(e) => { const c = cellsByFactory(e.target.value)[0]; if (c) edit((ms) => setHop(ms, p.partId, step, { factory: c.factory, cellId: c.cellId, routeId: c.routes[0]?.routeId ?? '', variantId: c.routes[0]?.variantId ?? '' }), `Routing hop edit ${p.partId}`); }}>
+                                  {['F1', 'F2', 'F3', 'F4'].map((f) => <option key={f}>{f}</option>)}
+                                </select>
+                                <select className={`${input} max-w-[160px]`} aria-label={`Step ${step} cell`} value={hm.cellId} onChange={(e) => { const c = state.passports.find((x) => x.cellId === e.target.value)!; edit((ms) => setHop(ms, p.partId, step, { factory: c.factory, cellId: c.cellId, routeId: c.routes[0]?.routeId ?? '', variantId: c.routes[0]?.variantId ?? '' }), `Routing hop edit ${p.partId}`); }}>
+                                  {cellsByFactory(hm.factory).map((c) => <option key={c.cellId} value={c.cellId}>{c.cellId} · {c.cellName}</option>)}
+                                </select>
+                                <select className={`${input} max-w-[200px]`} aria-label={`Step ${step} route`} value={hm.routeId} onChange={(e) => { const r = hp!.routes.find((x) => x.routeId === e.target.value)!; edit((ms) => setHop(ms, p.partId, step, { factory: hm.factory, cellId: hm.cellId, routeId: r.routeId, variantId: r.variantId }), `Routing hop edit ${p.partId}`); }}>
+                                  {!hp?.routes.some((r) => r.routeId === hm.routeId) && <option value={hm.routeId}>{hm.routeId} (stale)</option>}
+                                  {hp?.routes.map((r) => <option key={r.routeId} value={r.routeId}>{r.routeId}</option>)}
+                                </select>
+                                <button className="rounded border border-slate-300 px-1 hover:bg-slate-50 disabled:opacity-30" aria-label={`Move step ${step} earlier`} title="Move earlier" onClick={() => edit((ms) => moveHop(ms, p.partId, step, -1), `Reorder routing hops ${p.partId}`)}>↑</button>
+                                <button className="rounded border border-slate-300 px-1 hover:bg-slate-50 disabled:opacity-30" aria-label={`Move step ${step} later`} title="Move later" disabled={step === chain.length} onClick={() => edit((ms) => moveHop(ms, p.partId, step, 1), `Reorder routing hops ${p.partId}`)}>↓</button>
+                                <button className="text-slate-400 hover:text-red-600" aria-label={`Remove step ${step}`} title="Remove this hop" onClick={() => edit((ms) => removeHop(ms, p.partId, step), `Remove routing hop ${p.partId}`)}>✕</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {suggestions.length > 0 && (
                     <tr>
                       <td className={`${td} bg-amber-50/50`} colSpan={7}>

@@ -5384,6 +5384,53 @@
               "vaType": "NVA"
             }
           ]
+        },
+        {
+          "routeId": "RT-ATL-HM-W-01-S3-GRIND",
+          "variantId": "ATL-HM-W-01",
+          "productFamily": "ATLAS",
+          "description": "End Cap — finish grind after anodise (step 3)",
+          "batchSize": 20,
+          "ops": [
+            {
+              "opNo": 310,
+              "description": "Load & clamp anodised part",
+              "setupMin": 0,
+              "cycleMin": 0.6,
+              "labourMin": 0.6,
+              "skillId": "SK-CNC",
+              "vaType": "NVA"
+            },
+            {
+              "opNo": 320,
+              "description": "Finish grind bearing diameters",
+              "assetId": "CELL-L-GRIND-01",
+              "setupMin": 30,
+              "cycleMin": 3.2,
+              "labourMin": 0.8,
+              "skillId": "SK-CNC",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 330,
+              "description": "CMM final inspection",
+              "assetId": "CELL-L-CMM-02",
+              "setupMin": 5,
+              "cycleMin": 1,
+              "labourMin": 0.4,
+              "skillId": "SK-CMM",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 340,
+              "description": "Move to despatch buffer",
+              "setupMin": 0,
+              "cycleMin": 0.3,
+              "labourMin": 0.3,
+              "skillId": "SK-GEN",
+              "vaType": "NVA"
+            }
+          ]
         }
       ],
       "serviceAllowance": {
@@ -9165,6 +9212,72 @@
               "setupMin": 0,
               "cycleMin": 3.3,
               "labourMin": 3.3,
+              "skillId": "SK-GEN",
+              "vaType": "NVA"
+            }
+          ]
+        },
+        {
+          "routeId": "RT-ATL-HM-W-01-S2-ANOD",
+          "variantId": "ATL-HM-W-01",
+          "productFamily": "ATLAS",
+          "description": "End Cap — hard anodise (step 2)",
+          "batchSize": 40,
+          "ops": [
+            {
+              "opNo": 210,
+              "description": "Receive & rack parts from F1",
+              "setupMin": 0,
+              "cycleMin": 0.4,
+              "labourMin": 0.4,
+              "skillId": "SK-CHEM",
+              "vaType": "NVA"
+            },
+            {
+              "opNo": 220,
+              "description": "Degrease",
+              "assetId": "F3-C09-WASH-02",
+              "setupMin": 5,
+              "cycleMin": 0.3,
+              "labourMin": 0.1,
+              "skillId": "SK-GEN",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 230,
+              "description": "Hard anodise bath",
+              "assetId": "F3-C09-ANOD-01",
+              "setupMin": 20,
+              "cycleMin": 0.9,
+              "labourMin": 0.15,
+              "skillId": "SK-CHEM",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 240,
+              "description": "Seal",
+              "assetId": "F3-C09-ANOD-01",
+              "setupMin": 0,
+              "cycleMin": 0.3,
+              "labourMin": 0.05,
+              "skillId": "SK-CHEM",
+              "vaType": "VA"
+            },
+            {
+              "opNo": 250,
+              "description": "Unrack & inspect coating",
+              "setupMin": 0,
+              "cycleMin": 0.4,
+              "labourMin": 0.4,
+              "skillId": "SK-CHEM",
+              "vaType": "ENVA"
+            },
+            {
+              "opNo": 260,
+              "description": "Pack & despatch back to F1",
+              "setupMin": 0,
+              "cycleMin": 0.3,
+              "labourMin": 0.3,
               "skillId": "SK-GEN",
               "vaType": "NVA"
             }

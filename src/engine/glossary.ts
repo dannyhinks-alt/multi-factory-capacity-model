@@ -37,6 +37,9 @@ export const GLOSSARY = {
   crossPallets: 'Pallets per year shipped between plants — every transfer adds trucks, paperwork and lead time.',
   interPlantKm: 'Road kilometres per year driven between plants using the editable F1–F4 distances.',
   handling: 'Labour hours per year spent moving material (pick-up, set-down, driving, truck loading) — pure non-value-added cost.',
+  logistics: 'Annual cost of the inter-plant milk-run trucks (runs per week × trucks needed per run × £ per truck) — the price of splitting work across plants.',
+  transit: 'Days a pallet spends on the road between plants — added to buffer cover and to the BOM cumulative lead time whenever a part changes factory.',
+  multiHop: 'Ordered routing steps for one part number travelling through several cells or factories in sequence (e.g. machine, anodise, finish grind).',
   bottleneckCycle: 'Bottleneck_Cycle_Min sets the steady-state output rate in Plant Simulation (one part leaves every cycle).',
   leadTime: 'Total_Route_LeadTime_Min is how long a whole transfer batch really takes to get through the cell (setup plus touch plus walk-away time).',
 } as const;

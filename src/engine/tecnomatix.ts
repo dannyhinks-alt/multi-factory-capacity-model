@@ -33,6 +33,9 @@ export interface TxRoutingRow extends Record<string, unknown> {
   Proc_Time_Sec: number;
   /** Steady-state rate: bottleneck cycle per unit (min). */
   Bottleneck_Cycle_Min: number;
+  /** Sequential routing step of the part at this station (1…Routing_Steps). */
+  Routing_Step: number;
+  Routing_Steps: number;
   /** Realistic batch transit delay: Σ setup + batch × Σ (touch + walk-away) (min). */
   Total_Route_LeadTime_Min: number;
   Availability_Pct: number;
@@ -100,7 +103,7 @@ export const DEFAULT_MTTR_SEC = 30 * 60;
  * routing chains each macro-op to the line-side buffer and station of its consuming cell (or the despatch Drain).
  */
 export function buildTecnomatixExport(model: HubModel, state: HubState): TxExport {
-  const routing = buildDesRouting(model, state.sharedWorkCentres);
+  const routing = buildDesRouting(model, state.sharedWorkCentres, state.mappings);
   const buffersByProducer = new Map<string, (typeof model.stores.buffers)[number]>();
   for (const b of model.stores.buffers) buffersByProducer.set(`${b.producerCellId}|${b.partId}`, b);
   const Routing_DataTable: TxRoutingRow[] = routing.map((r) => {
@@ -118,6 +121,8 @@ export function buildTecnomatixExport(model: HubModel, state: HubState): TxExpor
       Setup_Time_Sec: Math.round(r.setupMin * 60),
       Proc_Time_Sec: Math.round(r.cycleMin * 60 * 100) / 100,
       Bottleneck_Cycle_Min: Math.round(r.cycleMin * 1000) / 1000,
+      Routing_Step: r.routingStep,
+      Routing_Steps: r.routingSteps,
       Total_Route_LeadTime_Min: Math.round(r.routeLeadTimeMin * 100) / 100,
       Availability_Pct: Math.round(r.oeePct * 10) / 10,
       MTTR_Sec: DEFAULT_MTTR_SEC,

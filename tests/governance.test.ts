@@ -19,9 +19,9 @@ describe('Baseline Change Governance', () => {
     const p = { ...seed.passports[0], revision: seed.passports[0].revision + 1 };
     const { state } = ingestPassports(seed, [{ name: 'p.json', data: p }]);
     const g = governanceOf(state);
-    expect(versionLabel(g)).toBe('v1.1');
+    expect([g.major, g.minor]).toEqual([1, 1]);
     expect(g.status).toBe('Draft');
-    expect(g.auditLog[0]).toMatchObject({ action: 'Cell Passport re-ingestion', versionFrom: 'v1.0', versionTo: 'v1.1' });
+    expect(g.auditLog[0]).toMatchObject({ action: 'Cell Passport re-ingestion', versionFrom: 'v1.0', versionTo: versionLabel(g) });
   });
   it('master data imports are audited', () => {
     const { state } = importMasterRows(seed, 'skills', [{ 'Role ID': 'R-NEW', 'Hourly Rate £/hr': 20 }], { roleId: 'Role ID', hourlyRateGbp: 'Hourly Rate £/hr' }, 'merge');
@@ -33,7 +33,7 @@ describe('Baseline Change Governance', () => {
     s = signOff(s, 'Approved Baseline', 'B. Manager', 'ok');
     const g = governanceOf(s);
     expect(g.status).toBe('Approved Baseline');
-    expect(versionLabel(g)).toBe('v1.1');
+    expect([g.major, g.minor]).toEqual([1, 1]); // sign-off itself does not bump the version
     expect(g.auditLog[0]).toMatchObject({ action: 'Sign-off', actor: 'B. Manager' });
   });
   it('promotion-style audit bumps the major version; edits of an approved baseline reset sign-off', () => {

@@ -144,9 +144,104 @@ export function reconcileMappings(mappings: RouteMapping[], passports: CellPassp
 /** Route demand key used throughout the engine. */
 export const routeKey = (cellId: string, routeId: string) => `${cellId}::${routeId}`;
 
+// ---------------------------------------------------------------- sequential multi-hop routing
+
+/** Routing step of a mapping (1, 2, 3…); mappings without `seq` are step 1. */
+export const stepOf = (m: RouteMapping): number => Math.max(1, Math.round(m.seq ?? 1));
+
+/**
+ * Ordered routing chain of one BOM part: an array of steps (ascending `seq`), each holding its parallel
+ * dual-source mappings. A part travels Step 1 → Step 2 → … sequentially (e.g. F1 Machining → F3 Surface
+ * Treatment → F1 Finish Grind) and every step processes the part's full in-house demand × its share.
+ */
+export type RoutingChain = RouteMapping[][];
+
+/** Routing chains for every mapped part (steps sorted by `seq`; gaps in numbering are collapsed). */
+export function chainsByPart(mappings: RouteMapping[]): Map<string, RoutingChain> {
+  const byPart = new Map<string, Map<number, RouteMapping[]>>();
+  for (const m of mappings) {
+    const steps = byPart.get(m.bomPartId) ?? new Map<number, RouteMapping[]>();
+    steps.set(stepOf(m), [...(steps.get(stepOf(m)) ?? []), m]);
+    byPart.set(m.bomPartId, steps);
+  }
+  const out = new Map<string, RoutingChain>();
+  for (const [part, steps] of byPart) out.set(part, [...steps.entries()].sort((a, b) => a[0] - b[0]).map(([, ms]) => ms));
+  return out;
+}
+
+/** Largest-share mapping of a routing step (the step's primary route). */
+export const primaryOf = (step: RouteMapping[]): RouteMapping => step.slice().sort((a, b) => (b.sharePct ?? 100) - (a.sharePct ?? 100))[0];
+
+/** Share of a step's demand carried by one mapping (0–1). */
+export const shareOf = (m: RouteMapping): number => Math.max(0, m.sharePct ?? 100) / 100;
+
+/** A routing hop target: a cell route in a factory. */
+export interface HopTarget {
+  factory: RouteMapping['factory'];
+  cellId: string;
+  routeId: string;
+  variantId: string;
+}
+
+/**
+ * Set the primary route of routing step `step` for a part (manual link). The step's largest-share mapping is
+ * re-pointed (its share kept); other parallel dual-source mappings and every other step are untouched.
+ * Setting step 1 on an unmapped part creates its first mapping.
+ */
+export function setHop(mappings: RouteMapping[], partId: string, step: number, hop: HopTarget, now = new Date().toISOString()): RouteMapping[] {
+  const chain = chainsByPart(mappings).get(partId) ?? [];
+  const st = chain[step - 1];
+  const fresh: RouteMapping = { ...hop, bomPartId: partId, source: 'manual', updatedAt: now, ...(step > 1 ? { seq: step } : {}) };
+  if (!st) return [...mappings, fresh];
+  const prim = primaryOf(st);
+  return mappings.map((m) => (m === prim ? { ...m, ...hop, source: 'manual', updatedAt: now } : m));
+}
+
+/** Append a sequential hop (Step n+1) to a part's routing chain; returns the new mapping table. */
+export function addHop(mappings: RouteMapping[], partId: string, hop: HopTarget, now = new Date().toISOString()): RouteMapping[] {
+  const n = (chainsByPart(mappings).get(partId) ?? []).length;
+  return renumberChain([...mappings, { ...hop, bomPartId: partId, source: 'manual', updatedAt: now, seq: n + 1 }], partId);
+}
+
+/** Remove routing step `step` (all its parallel mappings) and close the gap in the numbering. */
+export function removeHop(mappings: RouteMapping[], partId: string, step: number): RouteMapping[] {
+  const chain = chainsByPart(mappings).get(partId) ?? [];
+  const drop = new Set(chain[step - 1] ?? []);
+  return renumberChain(mappings.filter((m) => !drop.has(m)), partId);
+}
+
+/** Move routing step `step` one place earlier (−1) or later (+1) in the sequence. */
+export function moveHop(mappings: RouteMapping[], partId: string, step: number, dir: -1 | 1): RouteMapping[] {
+  const chain = chainsByPart(mappings).get(partId) ?? [];
+  const j = step - 1 + dir;
+  if (step < 1 || step > chain.length || j < 0 || j >= chain.length) return mappings;
+  const order = chain.map((_s, i) => i);
+  [order[step - 1], order[j]] = [order[j], order[step - 1]];
+  const newSeq = new Map<RouteMapping, number>();
+  order.forEach((orig, pos) => chain[orig].forEach((m) => newSeq.set(m, pos + 1)));
+  return mappings.map((m) => (newSeq.has(m) ? withSeq(m, newSeq.get(m)!) : m));
+}
+
+/** Renumber a part's steps to 1…n (keeps order); step 1 drops the explicit `seq`. */
+export function renumberChain(mappings: RouteMapping[], partId: string): RouteMapping[] {
+  const chain = chainsByPart(mappings).get(partId) ?? [];
+  const newSeq = new Map<RouteMapping, number>();
+  chain.forEach((st, i) => st.forEach((m) => newSeq.set(m, i + 1)));
+  return mappings.map((m) => (newSeq.has(m) ? withSeq(m, newSeq.get(m)!) : m));
+}
+
+function withSeq(m: RouteMapping, seq: number): RouteMapping {
+  const { seq: _old, ...rest } = m;
+  void _old;
+  return seq > 1 || chainLengthHint(m) ? { ...rest, seq } : rest;
+}
+/** Keep an explicit `seq: 1` on first steps that already carried one (multi-hop parts stay self-describing). */
+const chainLengthHint = (m: RouteMapping) => m.seq !== undefined;
+
 /**
  * Push exploded BOM gross demand through the mapping table onto each `Cell → Route` slot.
- * Dual-source mappings carry `sharePct`; subcontracted (bought-in) share is removed before loading cells.
+ * Dual-source mappings carry `sharePct` (within their routing step); every sequential step of a multi-hop
+ * chain carries the part's full demand. Subcontracted (bought-in) share is removed before loading cells.
  */
 export function demandByRoute(mappings: RouteMapping[], explosion: BomExplosion, subcontracts: Subcontract[] = []): Map<string, RouteDemand> {
   const out = new Map<string, RouteDemand>();

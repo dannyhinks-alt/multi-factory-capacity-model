@@ -1,6 +1,9 @@
-# Project: Multi-Factory Master Capacity, Services & Simulation Hub — Multi-Factory Master Control Hub v1.1
+# Project: Multi-Factory Master Capacity, Services & Simulation Hub — Multi-Factory Master Control Hub v1
 
-Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complete integrated platform as *Multi-Factory Master Control Hub v1.1* — no incremental build tags or temporary sub-version labels in UI copy, tooltips, headers or docs. The Live Baseline's own data version (`vMAJOR.MINOR` governance badge) starts at v1.0 and is independent of the release number.
+Release **1.0.0** (`package.json`, `src/engine/version.ts`). Present the complete integrated platform as *Multi-Factory Master Control Hub v1*:
+- **Release labels:** page title *"Multi-Factory Master Control Hub v1"*, header badge *"v1"*, backup envelope `appVersion: "1.0.0"`.
+- **No build tags:** no incremental build tags or temporary sub-version labels in UI copy, tooltips, headers, tests or docs.
+- **Baseline data version:** the Live Baseline's own `vMAJOR.MINOR` governance badge starts at **v1.0** (*Approved Baseline*). The seed audit log holds only the single clean *Baseline created* entry.
 
 ## 1. Core Objective
 - **What to build:** an offline-first React + TypeScript + Vite + Tailwind CSS web application, the **Multi-Factory Master Control Hub**.
@@ -11,7 +14,7 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
 
 ## 2. Architecture Rationale & Three-Tier Digital Thread
 1. **Architecture Rationale**
-   - **Master Control Hub** (deterministic): owns BOM explosion, FPD governance, CapEx / utilities / space / stores / material flow and rapid scenario trade-offs.
+   - **Master Control Hub** (deterministic): owns BOM explosion, multi-hop routing, FPD governance, CapEx / utilities / space / stores / material flow / inter-plant logistics and rapid scenario trade-offs.
    - **Cell Design Passports:** own each cell's micro-route detail.
    - **Siemens Plant Simulation:** receives the folded Macro-Blocks and WIP Buffers for time-based queue and stochastic OEE validation.
    - **Where it is shown:** a summary card on the System Map and in Phase 4, and a section in README.md.
@@ -30,7 +33,18 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
      | Alias Dictionary | *Incoming Nickname* `<datalist>` filled with flagged unrecognised IDs |
 3. **5-Level BOM ↔ Cell Passport Route Linker & Re-Ingestion**
    - **Ownership:** the hub owns the **5-Level BOM (`L1 → L5`)** and the **Master Schedule**.
-   - **Mapping table:** a persistent **BOM ↔ Cell Route Mapping Table** (`BOM Part ID` → `Factory` + `Cell ID` + `Route/Variant ID`, optional dual-source `sharePct`).
+   - **Mapping table:** a persistent **BOM ↔ Cell Route Mapping Table** (`BOM Part ID` → `Factory` + `Cell ID` + `Route/Variant ID`), with two optional extensions:
+     - **Parallel dual-source `sharePct`:** shares sum to 100% within each routing step.
+     - **Sequential multi-hop routing:** an ordered `seq` (1, 2, 3…) lets one BOM part number travel through several cells and factories in sequence (e.g. F1 Machining → F3 Surface Treatment → F1 Finish Grind) without duplicating BOM levels.
+   - **Chain following:** every engine follows the chain *Step 1 → Step 2 → … → parent BOM tier's Step 1*:
+     - BOM demand roll-up: every step carries the full in-house demand × its share
+     - Cell Macro-Blocks
+     - floor-plan flow vectors
+     - WIP buffers, including hop buffers
+     - Plant Simulation `Routing_DataTable` / `Buffer_DataTable`
+     - BOM cumulative lead time
+     - Fixed Process drift: each hop is checked against the steps it performs; Op Nos run sequentially across hops
+   - **Helpers:** read chains through `chainsByPart` / `primaryOf` / `shareOf`, and edit them through `setHop` / `addHop` / `moveHop` / `removeHop` (`src/engine/mapping.ts`).
    - **Matching:** automatic ID / name matching on first upload; saved mappings thereafter.
    - **Batch ingestion:** multi-file `.json` ingestion routes each cell's rolled-up metrics into its mapped `Factory → Cell → BOM` slot.
 4. **Micro-to-Macro Roll-Up & Background Ingestion Audit**
@@ -95,6 +109,7 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
      - Stores & WIP
      - Average Utilisation, OEE, TEEP, PCE (`VA / NVA / ENVA`)
      - Bottleneck / Blocked Cells
+     - Inter-Plant Logistics £/yr
      - Material Handling h/yr
    - **"Where Parts Wait & Travel Most" strip** (also in Phase 3), three columns:
      - (a) Longest Process Dwell: top 3 cells / work centres by process + batch dwell hours, with WIP £
@@ -133,7 +148,8 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
 3. **5-Level BOM & Master Schedule (`L1 → L5`)**
    - **Demand:** time-phased demand (`Q1–Q4` / annual + launch-rate overrides).
    - **Explosion:** net / gross explosion, cumulative scrap / yield, critical-path lead times, the shared `L5` roll-up and Cascade Bottlenecks.
-   - **Route Linker:** included here.
+   - **Lead time:** cumulative lead time includes cross-factory transfer days (`interPlantTransitDays` per factory change in the routing chain and per cross-factory hand-over to the parent).
+   - **Route Linker:** engineers can **add, reorder or remove sequential routing hops** on any Make part (factory / cell / route per hop, ↑ ↓ ✕). Multi-hop legs are shown as a chain with factory-change markers, and a *Multi-hop* filter is available.
 4. **Assets & Workforce Skills**
    - **Catalogue manager** with the dropdowns above, and the `0–3` competence matrix (`>= 2` productive rule).
    - **Dictionary Defaults:**
@@ -144,9 +160,12 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
      - **editable F1–F4 inter-plant distances**
      - **material-flow assumptions**
      - **Shared Work Centre risk thresholds**
+     - **inter-plant logistics:** `interPlantCostPerTruckGbp` (default £180), `interPlantTransitDays` (default 1.0 day), `milkRunsPerWeek` (default 5)
 5. **Buffers, WIP & Stores**
    - **Four tiers:** Raw Material & Bought-Out Stores (L5), Kitting / Marshalling Zones (L2–L4), Inter-Cell WIP Buffers / Line-Side Supermarkets, Finished Goods & Despatch Staging (L1).
    - **WIP buffer sizing:** recommended buffer = batch + setup cover + z × CV(OEE) × demand rate × replenishment time.
+   - **Cross-factory cover:** whenever `producerFactory !== consumerFactory`, add **inter-plant transit & milk-run cover** = daily demand × (transit days + working days per week ÷ milk runs per week).
+   - **Buffer placement:** buffers sit on child last step → parent Step 1, and on every Step k → Step k+1 hop.
    - **Outputs:** Days of Cover, locations / stillages, Stores Footprint (m²) and Working Capital Tied Up (£), using standard cost rolled up the BOM.
 
 ## 6. Phase 3 · Design & Scenarios
@@ -156,6 +175,10 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
    - **Capacity comparison:** a **3-bar visual** (Machine Cap vs Competent Labour Skill ≥ 2 Cap vs Tooling Dwell Cap) against Required Demand.
    - **Verdict:** a **plain-English 1-line bottleneck verdict** on expanded cells.
    - **Shared Work Centre designation.**
+   - **Live Cell & Route Quick-Editor:** an inline **"✎ Edit Cell / Route"** drawer on expanded cells.
+     - **Fields:** shift count, gate status, Shared Work Centre toggle, and route batch size, setup minutes and cycle minutes.
+     - **Behaviour:** edits apply directly to the live model, with micro-ops re-scaled so the re-fold matches (`src/engine/quickedit.ts`).
+     - **Governance:** every applied edit is logged in Baseline Governance & Audit (`Baseline edit`, minor bump) and resets Approved status to Draft.
    - **Solver:** the What-If Shift / CapEx solver.
 2. **Shared Work Centre governance**
    - **Single ownership:** any Asset ID in more than one Cell Passport, or in both a passport and Shared Plant, is a Logic Integrity **error**, preventing double-counted CapEx, m² and utilities.
@@ -165,11 +188,17 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
    - **Plan image:** an optional 2D `.png` / `.jpg` / `.svg` plan per active factory, with **2-point metre scale calibration** and an auto-grid fallback.
    - **Blocks:** drag-and-drop scaled cell, Shared Work Centre and store footprint blocks.
    - **Flow overlay:** part-flow vectors derived from the 5-Level BOM and Cell Route mappings, drawn as weighted spaghetti lines.
+   - **Exact per-plant attribution:** a cross-factory move credits the **origin factory** with its exact *Origin Cell → Origin Despatch Dock* rectilinear leg (km/yr, pallet moves, handling hours), and the **destination factory** with its exact *Destination Receiving Dock → Destination Cell / Work Centre* leg. Moves are never split 50/50.
+   - **Inter-plant logistics:** directed milk-run lanes.
+     - trucks/yr = milk runs/yr × ⌈pallets per run ÷ pallets per truck⌉
+     - road km/yr = trucks × km × 2
+     - **logistics £/yr = trucks × £ per truck**, credited to the origin plant
    - **Metrics:**
      - **Intra-Factory Travel (km/yr)**
      - **Cross-Factory Transfers (units & pallets/yr)**
      - **Inter-Plant Distance (km/yr)**, using the editable F1–F4 distances
      - **Material Handling Hours/yr**
+     - **Inter-Plant Logistics Cost (£/yr)**
      - Spaghetti Intensity
    - **Surfaced in:** Scenario Comparison and the cause-effect diagnostics.
 4. **Facility & Cell Services Specifier**
@@ -180,7 +209,7 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
    - **Factory network:** **per-scenario Active Factory switches**.
    - **Cell vs Cells:** move / clone (with % dual-source) / merge / decommission. Space table: Cells + Circulation m², Stores & Buffers m², Total m² vs `floorAreaM2`. Relocation vs Replication CapEx (£).
    - **Asset vs Asset Load:** reassignment, Asset Load Heatmap (Q1–Q4 + annual; Baseline / Scenario / Δ) and the Binding Cap re-check.
-   - **Route vs Route:** micro-op edits, op split across 2 machines, setup / cycle / batch / tooling, Macro-Block override (incl. Effective OEE %), quick Shift Pattern (1/2/3 shifts with crew), dual-source splits and Make-vs-Buy.
+   - **Route vs Route:** micro-op edits, op split across 2 machines, setup / cycle / batch / tooling, Macro-Block override (incl. Effective OEE %), quick Shift Pattern (1/2/3 shifts with crew), dual-source splits within a routing step (other hops untouched) and Make-vs-Buy.
    - **Stress-test presets:**
      - SMED −50% setup / batch halving
      - 2→3 shifts / overtime / key Level-3 operator absence
@@ -193,29 +222,34 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
      - footprint, stores, working capital
      - FPD alignment
      - utility / space overruns
-     - **intra-factory travel, cross-factory transfers, inter-plant distance, material handling, Shared Work Centre risks**
+     - **intra-factory travel, cross-factory transfers, inter-plant distance, inter-plant logistics cost (£/yr), material handling, Shared Work Centre risks**
+     - unit conversion cost includes logistics
      - OEE, TEEP, PCE
    - **"Key Effects & Possible Causes":**
      - binding-constraint shifts and L2–L5 ripple; schedule changes; gates
      - utility / space triggers; cost
-     - Stores, Process, **Flow** and **Factories** chains
+     - Stores, Process, **Flow** (incl. logistics £/yr and milk-run lanes opened / closed) and **Factories** chains
    - **Exports:** `.csv` / `.json` / print-friendly HTML; send any scenario to Phase 4.
 
 ## 7. Phase 4 · Validation & Outputs
 1. **Siemens Tecnomatix Plant Simulation preset**
    - **Export:** a 1-click export from the Live Baseline or any scenario, as `.xlsx` / `.csv` / `.json`, containing:
-     - `Routing_DataTable`, outputting **both** `Bottleneck_Cycle_Min` (steady-state rate) **and** `Total_Route_LeadTime_Min` (Touch + Walk-Away batch transit delay)
+     - `Routing_DataTable`, outputting:
+       - **both** `Bottleneck_Cycle_Min` (steady-state rate) **and** `Total_Route_LeadTime_Min` (Touch + Walk-Away batch transit delay)
+       - `Routing_Step` / `Routing_Steps`
+       - next buffer / station along the routing chain
      - `ProductionPlan_DataTable`
      - `ShiftCalendar_DataTable`
-     - `Buffer_DataTable` (`Buffer_ID`, `Station_Path`, `Capacity_Units`, `Initial_WIP`, `Dwell_Time_Sec`)
+     - `Buffer_DataTable` (`Buffer_ID`, `Station_Path`, `Capacity_Units`, `Initial_WIP`, `Dwell_Time_Sec`), including hop buffers and transit cover
    - **Statistics import:** `StatWorkingTime`, `StatBlockingTime`, `StatWaitingTime`, `StatThroughput` → `AGREE` / `DISAGREE`, plus buffer starvation / blocking causes.
 2. **Generic DES export & validation:** flat routing / schedule tables (`CSV` / `JSON`) and DES result re-import with buffer queue monitoring.
 3. **Fixed Process ECR Release Pack:** `.xlsx` (5 sheets) / `.csv` / a print-ready sign-off pack of approved drifts; can be issued and locked as the next revision.
 4. **Cell Spec Sheets.**
 
 ## 8. Governance, Integrity & Active Factory Switch
-- **Logic & Data Integrity Check (36 checks):**
+- **Logic & Data Integrity Check (37 checks):**
   - BOM Nodes ↔ Cell Routes ↔ Micro/Macro Ops ↔ Buffers/Stores ↔ Facility Services ↔ Fixed Process
+  - dual-source shares per routing step; multi-hop sequence gaps or repeated hops
   - asset single ownership
   - cells / mappings in inactive factories
   - unknown Shared Work Centres
@@ -240,3 +274,17 @@ Release **1.1.0** (`package.json`, `src/engine/version.ts`). Present the complet
 - **Offline build:**
   - Bundle everything locally with zero external CDNs or network calls: `npm run build:offline` → `dist-offline/index.html`.
   - Force-add `dist-offline/index.html` to Git.
+
+## 10. Engineering conventions (software team)
+- **Engine:** `src/engine/` is pure and deterministic. `computeModel(state)` runs:
+  1. BOM explosion (incl. transit lead time)
+  2. routing-chain demand
+  3. Macro-Blocks
+  4. audit
+  5. services
+  6. stores (chain-aware buffers, transit cover)
+  7. flows (vectors, exact dock legs, milk-run lanes)
+
+  Views only read the model. Scenarios run the same pipeline on copy-on-write clones.
+- **Code standards:** JSDoc on every calculation function; targeted Vitest tests for every rule and edge case (`tests/`); no `window.prompt()` / `window.alert()`.
+- **Enforced by tests:** British English and the terminology rule, plus the release identity and the absence of build tags.

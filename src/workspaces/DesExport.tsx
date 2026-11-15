@@ -36,7 +36,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImport]);
-  const routing = useMemo(() => buildDesRouting(model, state.sharedWorkCentres).filter((r) => scope === 'All' || r.factory === scope), [model, state.sharedWorkCentres, scope]);
+  const routing = useMemo(() => buildDesRouting(model, state.sharedWorkCentres, state.mappings).filter((r) => scope === 'All' || r.factory === scope), [model, state.sharedWorkCentres, state.mappings, scope]);
   const schedule = useMemo(() => buildDesSchedule(routing), [routing]);
   const comparison = useMemo(() => compareDes(model, state.desResults, state.settings).filter((c) => scope === 'All' || c.factory === scope), [model, state.desResults, state.settings, scope]);
   const microOps = routing.reduce((s, r) => s + r.microOpsFolded, 0);
@@ -111,7 +111,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
           <table className="w-full">
             <thead className="sticky top-0 z-10">
               <tr>
-                {['Macro-op', 'Factory', 'Cell', 'Variant', 'Resource group', 'Qty', 'Batch', 'Setup min'].map((h) => <th key={h} className={th}>{h}</th>)}
+                {['Macro-op', 'Factory', 'Cell', 'Variant', 'Step', 'Resource group', 'Qty', 'Batch', 'Setup min'].map((h) => <th key={h} className={th}>{h}</th>)}
                 <th className={th}>Bottleneck cycle min<Hint text={explain('bottleneckCycle')} /></th>
                 <th className={th}>Route lead time min<Hint text={explain('leadTime')} /></th>
                 {['Eff. cycle', 'OEE', 'Folded ops', 'Binding', 'Cap/yr', 'Demand/yr', 'Q1', 'Q2', 'Q3', 'Q4'].map((h) => <th key={h} className={th}>{h}</th>)}
@@ -124,6 +124,7 @@ export default function DesExport({ navigate }: { navigate: (t: NavTarget) => vo
                   <td className={td}>{r.factory}</td>
                   <td className={`${td} font-mono text-[11px]`}>{r.cellId}</td>
                   <td className={`${td} font-mono text-[11px]`}>{r.variantId}</td>
+                  <td className={td} title={r.routingSteps > 1 ? explain('multiHop') : undefined}>{r.routingSteps > 1 ? `${r.routingStep}/${r.routingSteps}` : '—'}</td>
                   <td className={td}>{r.resourceGroup}</td>
                   <td className={tdNum}>{r.resourceQty}</td>
                   <td className={tdNum}>{r.batchSize}</td>

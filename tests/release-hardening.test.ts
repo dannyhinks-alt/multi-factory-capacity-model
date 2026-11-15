@@ -37,11 +37,11 @@ const singleMapped = (() => {
 
 // ------------------------------------------------------------------------------------------ release
 describe('Release identity', () => {
-  it('package.json and the version module agree on release v1.1; the default baseline starts at v1.0', () => {
+  it('package.json and the version module agree on release v1 (1.0.0); the default baseline starts at v1.0', () => {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-    expect(pkg.version).toBe('1.1.0');
+    expect(pkg.version).toBe('1.0.0');
     expect(APP_VERSION).toBe(pkg.version);
-    expect(APP_VERSION_LABEL).toBe('v1.1');
+    expect(APP_VERSION_LABEL).toBe('v1');
     expect(APP_NAME).toBe('Multi-Factory Master Control Hub');
     expect(versionLabel(seed.governance!)).toBe('v1.0');
   });
@@ -56,14 +56,15 @@ describe('Release identity', () => {
     };
     ['src', 'tests', 'scripts', '.github'].forEach((d) => existsSync(join(root, d)) && walk(join(root, d)));
     files.push(join(root, 'README.md'), join(root, 'CLAUDE.md'), join(root, 'index.html'));
-    const tag = new RegExp(['V1', '\\.[1-9]\\b'].join(''));
+    // Any incremental release / build tag (a v1 point label or a 1.x.0 version) — built from parts so this file never matches itself.
+    const tag = new RegExp(['[vV]1', '\\.[1-9]\\b|\\b1\\.[1-9]', '\\.0\\b'].join(''));
     const offenders = files.filter((f) => tag.test(readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
-    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('<title>Multi-Factory Master Control Hub v1.1</title>');
+    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('<title>Multi-Factory Master Control Hub v1</title>');
   });
   it('stamps backups and normalised passports with the release version', () => {
-    expect(JSON.parse(backupJson(seed)).appVersion).toBe('1.1.0');
-    expect((normalisedPassport(seed, 'CELL-A')!.normalisation as { exportedBy: string }).exportedBy).toBe('Multi-Factory Master Control Hub v1.1');
+    expect(JSON.parse(backupJson(seed)).appVersion).toBe('1.0.0');
+    expect((normalisedPassport(seed, 'CELL-A')!.normalisation as { exportedBy: string }).exportedBy).toBe('Multi-Factory Master Control Hub v1');
   });
 });
 
@@ -104,10 +105,10 @@ describe('Cross-workspace formula reconciliation (Phase 1 ↔ 2 ↔ 3 ↔ 4)', (
     const routing = buildDesRouting(model);
     expect(routing.length).toBe(model.cells.reduce((t, c) => t + c.routes.length, 0));
     close(routing.reduce((t, r) => t + r.demandAnnual, 0), model.cells.reduce((t, c) => t + c.annualDemand, 0), 1e-6);
-    // Each mapped part's gross demand lands on its routes exactly once (sharePct sums to 100%).
-    const routedByPart = new Map<string, number>();
-    for (const m of seed.mappings) routedByPart.set(m.bomPartId, (routedByPart.get(m.bomPartId) ?? 0) + (m.sharePct ?? 100));
-    for (const [part, pct] of routedByPart) expect([part, pct]).toEqual([part, 100]);
+    // Each mapped part's gross demand lands once on every routing step (sharePct sums to 100% per step).
+    const routedByStep = new Map<string, number>();
+    for (const m of seed.mappings) routedByStep.set(`${m.bomPartId}|${m.seq ?? 1}`, (routedByStep.get(`${m.bomPartId}|${m.seq ?? 1}`) ?? 0) + (m.sharePct ?? 100));
+    for (const [k, pct] of routedByStep) expect([k, pct]).toEqual([k, 100]);
     const tx = buildTecnomatixExport(model, seed);
     expect(tx.Routing_DataTable.length).toBe(routing.length);
     expect(tx.Buffer_DataTable.length).toBe(model.stores.buffers.length);

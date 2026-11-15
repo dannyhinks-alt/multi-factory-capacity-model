@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { NavTarget } from '../App';
 import { FlowLeaderboard } from '../components/FlowLeaderboard';
-import { Badge, Button, Card, Hint, Pills, Stat, fmtNum, input } from '../components/ui';
+import { Badge, Button, Card, Hint, Pills, Stat, fmtGbp, fmtNum, input } from '../components/ui';
 import { blockLabel, type BlockKind, type LayoutBlock } from '../engine/flow';
 import { explain } from '../engine/glossary';
 import { interPlantKm } from '../engine/settings';
@@ -84,7 +84,8 @@ export default function FloorPlan({ navigate }: { navigate: (t: NavTarget) => vo
       const k = `${a}>${b}`;
       const cur = m.get(k) ?? { a, b, pallets: 0, km: 0, cross: v.crossFactory, other: v.crossFactory ? (v.fromFactory === f ? v.toFactory : v.fromFactory) : undefined };
       cur.pallets += v.pallets;
-      cur.km += v.crossFactory ? v.internalKmPerYear / 2 : v.internalKmPerYear;
+      // Exact per-plant attribution: the origin leg counts in the despatching plant, the destination leg in the receiving plant.
+      cur.km += v.fromFactory === f ? v.originKmPerYear : v.destKmPerYear;
       m.set(k, cur);
     }
     return [...m.values()];
@@ -155,13 +156,14 @@ export default function FloorPlan({ navigate }: { navigate: (t: NavTarget) => vo
         subtitle="Upload a plan per factory, calibrate two points to metres (or use the auto-grid), then drag cells, Shared Work Centres and stores. Flow lines come from the 5-Level BOM and the Cell Route mappings — thicker = more pallets/yr."
         actions={<Pills value={f} onChange={setFactory} options={model.activeFactories.map((x) => ({ value: x, label: x }))} label="Factory" />}
       >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           <Stat label="Intra-factory travel" value={`${fmtNum(kpi.intraKmPerYear)} km/yr`} sub="loaded + empty return" hint={explain('intraKm')} />
           <Stat label="Pallet moves" value={fmtNum(kpi.palletMovesPerYear)} sub={`${state.settings.flow.unitsPerPallet} parts per pallet`} hint={explain('pallets')} />
           <Stat label="Handling" value={`${fmtNum(kpi.handlingHoursPerYear)} h/yr`} sub="pick-up, set-down, driving" hint={explain('handling')} />
           <Stat label="Spaghetti intensity" value={fmtNum(kpi.spaghettiIntensity)} sub="km/yr per 1,000 m²" hint={explain('spaghetti')} />
           <Stat label="Cross-factory out / in" value={`${fmtNum(crossOut.reduce((t, v) => t + v.pallets, 0))} / ${fmtNum(crossIn.reduce((t, v) => t + v.pallets, 0))}`} sub="pallets/yr" hint={explain('crossPallets')} />
           <Stat label="Inter-plant road" value={`${fmtNum([...crossOut, ...crossIn].reduce((t, v) => t + v.roadKmPerYear, 0))} km/yr`} sub="trucks to / from this plant" hint={explain('interPlantKm')} />
+          <Stat label="Inter-plant logistics" value={`${fmtGbp(kpi.logisticsCostGbp)}/yr`} sub={`despatched from ${f} · ${state.settings.interPlantTransitDays} day transit`} hint={explain('logistics')} />
         </div>
       </Card>
 
@@ -268,6 +270,22 @@ export default function FloorPlan({ navigate }: { navigate: (t: NavTarget) => vo
               ))}
               {!risks.size && <li className="text-xs text-slate-500">No Shared Work Centres designated — mark them in Cells &amp; Macro-Routing.</li>}
             </ul>
+          </Card>
+          <Card title="Milk-run lanes" subtitle={`${state.settings.milkRunsPerWeek} runs/week per lane · £${state.settings.interPlantCostPerTruckGbp} per truck · ${state.settings.interPlantTransitDays} day transit`}>
+            <table className="w-full text-xs">
+              <thead><tr className="text-left text-[10px] uppercase text-slate-500"><th className="py-0.5">Lane</th><th className="py-0.5 text-right">Pallets/yr</th><th className="py-0.5 text-right">Trucks/yr</th><th className="py-0.5 text-right">£/yr</th></tr></thead>
+              <tbody>
+                {model.flows.lanes.filter((l) => l.from === f || l.to === f).map((l) => (
+                  <tr key={`${l.from}>${l.to}`} title={`${l.from} → ${l.to}: ${fmtNum(l.roadKm, 1)} km each way, ${fmtNum(l.roadKmPerYear)} road km/yr — ${explain('logistics')}`}>
+                    <td className="py-0.5 text-slate-700">{l.from} → {l.to}</td>
+                    <td className="py-0.5 text-right tabular-nums">{fmtNum(l.pallets)}</td>
+                    <td className="py-0.5 text-right tabular-nums">{fmtNum(l.trucksPerYear)}</td>
+                    <td className="py-0.5 text-right tabular-nums">{fmtGbp(l.costGbp)}</td>
+                  </tr>
+                ))}
+                {!model.flows.lanes.some((l) => l.from === f || l.to === f) && <tr><td className="py-1 text-slate-500" colSpan={4}>No cross-factory flows touch {f}.</td></tr>}
+              </tbody>
+            </table>
           </Card>
           <Card title="Inter-plant distances" subtitle="Road km between plants (edit in Dictionary Defaults)" actions={<Button variant="ghost" onClick={() => navigate({ ws: 'master', tab: 'dictionary' })}>Edit →</Button>}>
             <table className="w-full text-xs">

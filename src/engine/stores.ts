@@ -9,7 +9,8 @@
  *  - FG  · Finished Goods & Despatch Staging (L1)
  */
 import type { BomExplosion, ExplodedLine } from './bom';
-import type { CellMacroBlock, RouteMacroBlock } from './rollup';
+import type { CellMacroBlock } from './rollup';
+import { chainsByPart, primaryOf, shareOf } from './mapping';
 import type { FactoryId, HubState, RouteMapping, StoreTier } from './types';
 import { FACTORIES } from './types';
 import { activeFactoryList } from './settings';
@@ -52,6 +53,10 @@ export interface WipBuffer extends StoreItem {
   cycleUnits: number;
   setupCoverUnits: number;
   safetyUnits: number;
+  /** Inter-plant transit + milk-run interval cover (cross-factory buffers only). */
+  transitCoverUnits: number;
+  /** Sequential routing hop this buffer sits on (Step `hopFrom` → `hopFrom + 1` of the same part), if any. */
+  hopFrom?: number;
   recommendedUnits: number;
   initialWipUnits: number;
   averageWipUnits: number;
@@ -85,30 +90,36 @@ const emptyTiers = () => ({ RM: emptyRoll(), KIT: emptyRoll(), WIP: emptyRoll(),
  *   cycle stock     = one transfer batch
  *   setup cover     = demand rate × setup minutes (consumer keeps running through the changeover)
  *   safety          = z × CV(OEE) × demand rate × T
- *   recommended     = ⌈cycle + setup cover + safety⌉;  initial WIP = ⌈setup cover + safety⌉
- *   average WIP     = batch ÷ 2 + setup cover ÷ 2 + safety  → dwell (s) = average ÷ rate × 60
+ *   transit cover   = daily demand × (inter-plant transit days + milk-run interval days)   [cross-factory only]
+ *   recommended     = ⌈cycle + setup cover + safety + transit cover⌉;  initial WIP = ⌈setup cover + safety + transit cover⌉
+ *   average WIP     = batch ÷ 2 + setup cover ÷ 2 + safety + daily × (transit + interval ÷ 2)  → dwell (s) = average ÷ rate × 60
  */
 export function sizeWipBuffer(
   args: { batchSize: number; setupMin: number; bottleneckCycleMin: number; oeePct: number; annualDemand: number; availableMinPerYear: number },
   z: number,
   cvPct: number,
-): Pick<WipBuffer, 'ratePerMin' | 'replenishmentMin' | 'cycleUnits' | 'setupCoverUnits' | 'safetyUnits' | 'recommendedUnits' | 'initialWipUnits' | 'averageWipUnits' | 'dwellSec'> {
+  transit?: { dailyDemand: number; transitDays: number; milkRunIntervalDays: number },
+): Pick<WipBuffer, 'ratePerMin' | 'replenishmentMin' | 'cycleUnits' | 'setupCoverUnits' | 'safetyUnits' | 'transitCoverUnits' | 'recommendedUnits' | 'initialWipUnits' | 'averageWipUnits' | 'dwellSec'> {
   const batch = Math.max(1, args.batchSize);
   const oee = Math.max(0.05, args.oeePct / 100);
   const rate = args.availableMinPerYear > 0 ? args.annualDemand / args.availableMinPerYear : 0;
   const replenishmentMin = args.setupMin + (batch * args.bottleneckCycleMin) / oee;
   const setupCoverUnits = rate * args.setupMin;
   const safetyUnits = z * (cvPct / 100) * rate * replenishmentMin;
-  const recommendedUnits = Math.ceil(batch + setupCoverUnits + safetyUnits);
-  const averageWipUnits = batch / 2 + setupCoverUnits / 2 + safetyUnits;
+  const t = transit ? Math.max(0, transit.transitDays) : 0;
+  const interval = transit ? Math.max(0, transit.milkRunIntervalDays) : 0;
+  const transitCoverUnits = transit ? transit.dailyDemand * (t + interval) : 0;
+  const recommendedUnits = Math.ceil(batch + setupCoverUnits + safetyUnits + transitCoverUnits);
+  const averageWipUnits = batch / 2 + setupCoverUnits / 2 + safetyUnits + (transit ? transit.dailyDemand * (t + interval / 2) : 0);
   return {
     ratePerMin: rate,
     replenishmentMin,
     cycleUnits: batch,
     setupCoverUnits,
     safetyUnits,
+    transitCoverUnits,
     recommendedUnits,
-    initialWipUnits: Math.ceil(setupCoverUnits + safetyUnits),
+    initialWipUnits: Math.ceil(setupCoverUnits + safetyUnits + transitCoverUnits),
     averageWipUnits,
     dwellSec: rate > 0 ? (averageWipUnits / rate) * 60 : 0,
   };
@@ -122,9 +133,10 @@ export function locationsFor(units: number, unitsPerLocation: number, m2PerLocat
 
 /**
  * Standard cost roll-up (£ per good unit): bought parts use their unit cost; made parts sum
- * children (qty per × child cost) plus mapped-route work content × conversion £/min, grossed up for own scrap.
+ * children (qty per × child cost) plus the work content of every step of the part's routing chain
+ * × conversion £/min, grossed up for own scrap.
  */
-export function standardCosts(state: HubState, explosion: BomExplosion, routeOf: (partId: string) => RouteMacroBlock | undefined): Map<string, number> {
+export function standardCosts(state: HubState, explosion: BomExplosion, workMinOf: (partId: string) => number): Map<string, number> {
   const firstLine = new Map<string, ExplodedLine>();
   for (const l of explosion.lines) if (!firstLine.has(l.partId) || (firstLine.get(l.partId)!.childIds.length === 0 && l.childIds.length > 0)) firstLine.set(l.partId, l);
   const bomById = new Map(state.bom.map((b) => [b.lineId, b]));
@@ -143,7 +155,7 @@ export function standardCosts(state: HubState, explosion: BomExplosion, routeOf:
         const ch = explosion.byLineId.get(id)!;
         return t + ch.qtyPer * cost(ch.partId, guard);
       }, 0);
-      const conversion = (routeOf(partId)?.totalWorkContentMin ?? 0) * rate;
+      const conversion = workMinOf(partId) * rate;
       c = (material + conversion) / Math.max(0.05, 1 - l.scrapPct / 100) + (own ?? 0);
     }
     guard.delete(partId);
@@ -162,14 +174,25 @@ export function computeStores(state: HubState, explosion: BomExplosion, cells: C
   const sd = state.settings.stores;
   const workingDaysPerYear = Math.max(1, state.settings.weeksPerYear * sd.workingDaysPerWeek);
   const cellById = new Map(cells.map((c) => [c.cellId, c]));
-  const mapsByPart = new Map<string, RouteMapping[]>();
-  for (const m of state.mappings) mapsByPart.set(m.bomPartId, [...(mapsByPart.get(m.bomPartId) ?? []), m]);
-  const primary = (partId: string) => (mapsByPart.get(partId) ?? []).slice().sort((a, b) => (b.sharePct ?? 100) - (a.sharePct ?? 100))[0];
-  const routeOf = (partId: string) => {
-    const m = primary(partId);
-    return m ? cellById.get(m.cellId)?.routes.find((r) => r.routeId === m.routeId) : undefined;
+  const chains = chainsByPart(state.mappings);
+  // Step-1 primary (where components are consumed / kitted) and last-step cells (where the part is finished).
+  const primary = (partId: string) => {
+    const c = chains.get(partId);
+    return c?.length ? primaryOf(c[0]) : undefined;
   };
-  const partCost = standardCosts(state, explosion, routeOf);
+  const lastStep = (partId: string) => {
+    const c = chains.get(partId);
+    return c?.length ? c[c.length - 1] : [];
+  };
+  const finisher = (partId: string) => {
+    const last = lastStep(partId);
+    return last.length ? primaryOf(last) : undefined;
+  };
+  const routeFor = (m: RouteMapping) => cellById.get(m.cellId)?.routes.find((r) => r.routeId === m.routeId);
+  const workMinOf = (partId: string) => (chains.get(partId) ?? []).reduce((t, step) => t + (routeFor(primaryOf(step))?.totalWorkContentMin ?? 0), 0);
+  const partCost = standardCosts(state, explosion, workMinOf);
+  const transitDays = Math.max(0, state.settings.interPlantTransitDays ?? 0);
+  const milkRunIntervalDays = sd.workingDaysPerWeek / Math.max(0.1, state.settings.milkRunsPerWeek ?? 5);
   const subOff = new Map((state.subcontracts ?? []).map((s) => [s.bomPartId, s.pct / 100]));
   const items: StoreItem[] = [];
   const buffers: WipBuffer[] = [];
@@ -212,67 +235,79 @@ export function computeStores(state: HubState, explosion: BomExplosion, cells: C
     push('KIT', f, partId, `${m.cellId} kitting zone`, d.annual * (1 - (subOff.get(partId) ?? 0)), sd.tiers.KIT.daysCover, material, d.level, d.description);
   }
 
-  // FG — L1 top Assemblies at despatch staging.
+  // FG — L1 top Assemblies at despatch staging of the factory finishing them (last routing step).
   for (const [partId, d] of explosion.demandByPart) {
     if (d.level !== 1) continue;
-    const f = factoryOf(partId) ?? 'F4';
+    const fin = finisher(partId);
+    const f = (fin && (cellById.get(fin.cellId)?.factory ?? fin.factory)) ?? 'F4';
     push('FG', f, partId, `${f} Despatch Staging`, d.annual, sd.tiers.FG.daysCover, partCost.get(partId) ?? 0, 1, d.description);
   }
 
-  // WIP — one buffer per producing route → consuming cell link (line-side supermarket at the consumer).
+  // WIP — one line-side supermarket per producing route → consuming cell link, following routing chains:
+  //   child part's last step → parent's Step 1, and Step k → Step k+1 of a multi-hop part.
   const seen = new Set<string>();
+  const addBuffer = (partId: string, description: string, level: number, m: RouteMapping, consumerCellId: string, annual: number, hopFrom?: number) => {
+    const key = `${partId}|${m.cellId}|${consumerCellId}`;
+    if (seen.has(key) || m.cellId === consumerCellId || annual <= 0) return;
+    const consumerCell = cellById.get(consumerCellId);
+    const producer = cellById.get(m.cellId);
+    const route = producer?.routes.find((r) => r.routeId === m.routeId);
+    if (!consumerCell || !producer || !route) return;
+    seen.add(key);
+    const daily = annual / workingDaysPerYear;
+    const crossFactory = producer.factory !== consumerCell.factory;
+    const sized = sizeWipBuffer(
+      { batchSize: route.batchSize, setupMin: route.rolledSetupMin, bottleneckCycleMin: route.bottleneckCycleMin, oeePct: route.effectiveOeePct, annualDemand: annual, availableMinPerYear: producer.availableMinPerYear },
+      sd.safetyZ,
+      sd.oeeVariabilityCvPct,
+      crossFactory ? { dailyDemand: daily, transitDays, milkRunIntervalDays } : undefined,
+    );
+    const rule = sd.tiers.WIP;
+    const loc = locationsFor(sized.recommendedUnits, rule.unitsPerLocation, rule.m2PerLocation);
+    const unitCost = partCost.get(partId) ?? 0;
+    const bufferId = `BUF_${m.cellId}_${consumerCellId}_${partId}`.replace(/[^A-Za-z0-9_]/g, '_');
+    buffers.push({
+      id: bufferId,
+      bufferId,
+      tier: 'WIP',
+      factory: consumerCell.factory,
+      partId,
+      description,
+      level,
+      location: `${consumerCellId} line-side`,
+      dailyDemand: daily,
+      stockUnits: sized.averageWipUnits,
+      daysCover: daily > 0 ? sized.recommendedUnits / daily : 0,
+      ...loc,
+      unitCostGbp: unitCost,
+      workingCapitalGbp: sized.averageWipUnits * unitCost,
+      producerCellId: m.cellId,
+      consumerCellId,
+      producerFactory: producer.factory,
+      crossFactory,
+      batchSize: route.batchSize,
+      setupMin: route.rolledSetupMin,
+      bottleneckCycleMin: route.bottleneckCycleMin,
+      oeePct: route.effectiveOeePct,
+      hopFrom,
+      ...sized,
+    });
+  };
+  const inHouse = (partId: string) => 1 - (subOff.get(partId) ?? 0);
   for (const l of explosion.lines) {
     if (l.makeBuy !== 'Make' || !l.parentLineId || l.level === 1) continue;
     const parent = explosion.byLineId.get(l.parentLineId);
     if (!parent) continue; // orphan line (missing parent) — reported by the integrity check
     const consumer = primary(parent.partId);
     if (!consumer) continue;
-    const consumerCell = cellById.get(consumer.cellId);
-    if (!consumerCell) continue;
-    for (const m of mapsByPart.get(l.partId) ?? []) {
-      const key = `${l.partId}|${m.cellId}|${consumer.cellId}`;
-      if (seen.has(key) || m.cellId === consumer.cellId) continue;
-      seen.add(key);
-      const producer = cellById.get(m.cellId);
-      const route = producer?.routes.find((r) => r.routeId === m.routeId);
-      if (!producer || !route) continue;
-      const annual = (explosion.demandByPart.get(l.partId)?.annual ?? 0) * ((m.sharePct ?? 100) / 100) * (1 - (subOff.get(l.partId) ?? 0));
-      if (annual <= 0) continue;
-      const sized = sizeWipBuffer(
-        { batchSize: route.batchSize, setupMin: route.rolledSetupMin, bottleneckCycleMin: route.bottleneckCycleMin, oeePct: route.effectiveOeePct, annualDemand: annual, availableMinPerYear: producer.availableMinPerYear },
-        sd.safetyZ,
-        sd.oeeVariabilityCvPct,
-      );
-      const rule = sd.tiers.WIP;
-      const loc = locationsFor(sized.recommendedUnits, rule.unitsPerLocation, rule.m2PerLocation);
-      const daily = annual / workingDaysPerYear;
-      const unitCost = partCost.get(l.partId) ?? 0;
-      const bufferId = `BUF_${m.cellId}_${consumer.cellId}_${l.partId}`.replace(/[^A-Za-z0-9_]/g, '_');
-      buffers.push({
-        id: bufferId,
-        bufferId,
-        tier: 'WIP',
-        factory: consumerCell.factory,
-        partId: l.partId,
-        description: l.description,
-        level: l.level,
-        location: `${consumer.cellId} line-side`,
-        dailyDemand: daily,
-        stockUnits: sized.averageWipUnits,
-        daysCover: daily > 0 ? sized.recommendedUnits / daily : 0,
-        ...loc,
-        unitCostGbp: unitCost,
-        workingCapitalGbp: sized.averageWipUnits * unitCost,
-        producerCellId: m.cellId,
-        consumerCellId: consumer.cellId,
-        producerFactory: producer.factory,
-        crossFactory: producer.factory !== consumerCell.factory,
-        batchSize: route.batchSize,
-        setupMin: route.rolledSetupMin,
-        bottleneckCycleMin: route.bottleneckCycleMin,
-        oeePct: route.effectiveOeePct,
-        ...sized,
-      });
+    for (const m of lastStep(l.partId)) addBuffer(l.partId, l.description, l.level, m, consumer.cellId, (explosion.demandByPart.get(l.partId)?.annual ?? 0) * shareOf(m) * inHouse(l.partId));
+  }
+  for (const [partId, chain] of chains) {
+    const d = explosion.demandByPart.get(partId);
+    if (!d || chain.length < 2) continue;
+    for (let k = 0; k < chain.length - 1; k++) {
+      const next = primaryOf(chain[k + 1]);
+      for (const m of chain[k]) addBuffer(partId, d.description, d.level, m, next.cellId, d.annual * shareOf(m) * inHouse(partId), k + 1);
     }
   }
 

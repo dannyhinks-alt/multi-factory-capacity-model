@@ -840,6 +840,11 @@ function DictionaryEditor({ compact = false }: { compact?: boolean }) {
               </label>
             ))}
           </div>
+          <div className="pt-2 text-xs font-semibold text-slate-700">Inter-plant logistics</div>
+          {num('Cost per inter-plant truck movement (interPlantCostPerTruckGbp)', 'interPlantCostPerTruckGbp', '£')}
+          <label className="flex items-center justify-between gap-2 text-xs text-slate-700"><span>Transit lead time between plants (interPlantTransitDays)</span><span className="flex items-center gap-1"><input type="number" step="0.1" className={`${input} w-20 text-right`} value={s.interPlantTransitDays} onChange={(e) => set({ interPlantTransitDays: Math.max(0, +e.target.value) })} />days</span></label>
+          {num('Milk runs per week per lane (milkRunsPerWeek)', 'milkRunsPerWeek', '/wk')}
+          <p className="text-[10px] text-slate-500">Cross-factory buffers add daily demand × (transit days + milk-run interval) cover; each cross-factory hand-over or hop adds the transit days to the BOM cumulative lead time; logistics £/yr = runs × trucks per run × £ per truck.</p>
           <div className="pt-2 text-xs font-semibold text-slate-700">Material flow & handling</div>
           {flowNum('Parts per pallet / stillage move', 'unitsPerPallet')}
           {flowNum('Pick-up + set-down per pallet move', 'handlingMinPerMove', 'min')}

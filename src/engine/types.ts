@@ -216,8 +216,13 @@ export interface RouteMapping {
   variantId: string;
   source: 'auto' | 'manual' | 'legacy' | 'scenario';
   updatedAt: string;
-  /** Share of the part's demand routed here (dual-source splits). Default 100%. */
+  /** Share of the part's demand routed here (parallel dual-source split within its step). Default 100%. */
   sharePct?: number;
+  /**
+   * Sequential routing step (1, 2, 3…) for multi-hop parts that travel through several cells / factories
+   * in order, e.g. F1 Machining (1) → F3 Surface Treatment (2) → F1 Finish Grind (3). Default 1.
+   */
+  seq?: number;
 }
 
 /** Make-vs-Buy subcontract offload of a BOM part (scenario lever). */
@@ -311,6 +316,12 @@ export interface Dictionary {
   interPlantKm: Record<string, number>;
   /** Material-flow, spaghetti and handling assumptions. */
   flow: FlowDictionary;
+  /** Inter-plant logistics: cost per truck movement (£), default £180. */
+  interPlantCostPerTruckGbp: number;
+  /** Inter-plant transit lead time (days) added to buffer cover and BOM cumulative lead time, default 1.0. */
+  interPlantTransitDays: number;
+  /** Scheduled inter-plant milk runs per week on each active lane, default 5. */
+  milkRunsPerWeek: number;
   /** Shared Work Centre queue-contention risk thresholds. */
   sharedWc: SharedWcRules;
 }

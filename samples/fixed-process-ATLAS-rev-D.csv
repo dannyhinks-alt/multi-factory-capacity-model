@@ -115,6 +115,16 @@ FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,90,CMM first-off / sample inspection,
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,100,Visual inspection & paperwork,0,4.4,2,,Y
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,110,"Mark, bag & tag",0,3.4,2,,N
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,120,Move to despatch buffer,0,4.1,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,210,Receive & rack parts from F1,0,0.4,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,220,Degrease,5,0.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,230,Hard anodise bath,20,0.9,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,240,Seal,0,0.3,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,250,Unrack & inspect coating,0,0.4,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,260,Pack & despatch back to F1,0,0.3,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,310,Load & clamp anodised part,0,0.6,2,,N
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,320,Finish grind bearing diameters,30,3.2,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,330,CMM final inspection,5,1,2,,Y
+FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-01,340,Move to despatch buffer,0,0.3,2,,N
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,10,Retrieve sheet / section,0,1.7,2,,N
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,20,Profile / form,22,30,2,,Y
 FPD-ATLAS-001,Rev D,2026-12-01,ATL-HM-W-02,30,Edge deburr / dress,5,8.8,2,,Y

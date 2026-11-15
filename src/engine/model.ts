@@ -1,10 +1,10 @@
 import { ancestorsOf, explodeBom, type BomExplosion } from './bom';
-import { demandByRoute, routeKey } from './mapping';
+import { chainsByPart, demandByRoute, primaryOf, routeKey } from './mapping';
 import { factoryFootprint, rollUpCell, type CellMacroBlock } from './rollup';
 import { computeStores, type StoresModel } from './stores';
 import { activeFactoryList, addServices, SERVICE_KEYS, ZERO_SERVICES } from './settings';
 import { computeFlows, type FlowModel } from './flow';
-import type { CellPassport, FactoryId, HubState, RouteMapping, ServiceVector } from './types';
+import type { BomLine, CellPassport, FactoryId, HubState, RouteMapping, ServiceVector } from './types';
 import { FACTORIES } from './types';
 
 export type BomFlag = 'Bottleneck' | 'Cascade' | 'Gate Blocked' | null;
@@ -74,6 +74,8 @@ export interface FactoryKpis {
   workingCapitalGbp: number;
   /** Cells incl. circulation + stores & buffers. */
   totalFootprintM2: number;
+  /** Inter-plant logistics £/yr (milk-run truck movements despatched from the scope's plants). */
+  interPlantLogisticsGbp: number;
   avgUtilisationPct: number;
   avgOeePct: number;
   avgTeepPct: number;
@@ -140,8 +142,30 @@ export function applyMacroOverrides(passports: CellPassport[], overrides: HubSta
  * BOM explosion → mapped route demand → Cell Macro-Blocks → cascade flags, audit, services balance,
  * Buffers & Stores and the material-flow / floor-plan model.
  */
+/**
+ * Cross-factory transfer lead time of a BOM line (days): each change of factory between consecutive steps
+ * of the part's routing chain, plus a hand-over to the parent's Step 1 in another factory, adds one
+ * inter-plant transit (Dictionary `interPlantTransitDays`). Factories come from the primary route of each step.
+ */
+export function transitDaysFn(state: HubState): (line: BomLine, parent: BomLine | null) => number {
+  const days = Math.max(0, state.settings.interPlantTransitDays ?? 0);
+  const cellFactory = new Map(state.passports.map((p) => [p.cellId, p.factory]));
+  const chains = chainsByPart(state.mappings.filter((m) => cellFactory.has(m.cellId)));
+  const stepFactories = (partId: string) => (chains.get(partId) ?? []).map((st) => cellFactory.get(primaryOf(st).cellId)!);
+  return (line, parent) => {
+    if (!days || line.makeBuy !== 'Make') return 0;
+    const fs = stepFactories(line.partId);
+    if (!fs.length) return 0;
+    let hops = 0;
+    for (let i = 1; i < fs.length; i++) if (fs[i] !== fs[i - 1]) hops++;
+    const parentFirst = parent ? stepFactories(parent.partId)[0] : undefined;
+    if (parentFirst && parentFirst !== fs[fs.length - 1]) hops++;
+    return hops * days;
+  };
+}
+
 export function computeModel(state: HubState): HubModel {
-  const explosion = explodeBom(state.bom, state.schedule);
+  const explosion = explodeBom(state.bom, state.schedule, transitDaysFn(state));
   const routeDemand = demandByRoute(state.mappings, explosion, state.subcontracts);
   const passports = applyMacroOverrides(state.passports, state.macroOverrides);
   const assetMap = new Map(state.assets.map((a) => [a.assetId, a]));
@@ -298,6 +322,9 @@ export function factoryKpis(model: HubModel, state: HubState, scope: FactoryId |
     storesFootprintM2: factories.reduce((s, f) => s + model.stores.byFactory[f].footprintM2, 0),
     workingCapitalGbp: factories.reduce((s, f) => s + model.stores.byFactory[f].workingCapitalGbp, 0),
     totalFootprintM2: factoryFootprintM2 + factories.reduce((s, f) => s + model.stores.byFactory[f].footprintM2, 0),
+    interPlantLogisticsGbp: model.flows
+      ? (scope === 'All' ? model.flows.totals.logisticsCostGbp : model.flows.byFactory.find((x) => x.factory === scope)?.logisticsCostGbp ?? 0)
+      : 0,
     avgUtilisationPct: avg(active.filter((c) => Number.isFinite(c.utilisationPct)).map((c) => c.utilisationPct)),
     avgOeePct: avg(cells.map((c) => c.effectiveOeePct)),
     avgTeepPct: avg(cells.map((c) => c.teepPct)),

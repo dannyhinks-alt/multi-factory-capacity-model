@@ -5,6 +5,7 @@
  */
 import type { HubModel } from './model';
 import { MAX_OPS_PER_ROUTE } from './rollup';
+import { chainsByPart, primaryOf, stepOf } from './mapping';
 import { activeFactoryList, SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { HubState } from './types';
 import { FACTORIES } from './types';
@@ -119,9 +120,28 @@ export function checkIntegrity(state: HubState, model: HubModel): IntegrityRepor
   }).map((m) => `${m.bomPartId} → ${m.cellId}/${m.routeId}`));
   add('map-nopart', 'BOM ↔ Cell Routes', 'Mappings for parts not in the BOM', 'warning', state.mappings.filter((m) => !state.bom.some((b) => b.partId === m.bomPartId)).map((m) => `${m.bomPartId} → ${m.cellId}`));
   add('map-buy', 'BOM ↔ Cell Routes', 'Bought-out parts mapped to a cell route', 'warning', state.mappings.filter((m) => state.bom.some((b) => b.partId === m.bomPartId) && state.bom.filter((b) => b.partId === m.bomPartId).every((b) => b.makeBuy === 'Buy')).map((m) => `${m.bomPartId} → ${m.cellId}`));
+  // Dual-source shares are parallel within a routing step; every sequential step must total 100%.
   const shares = new Map<string, number>();
-  for (const m of state.mappings) shares.set(m.bomPartId, (shares.get(m.bomPartId) ?? 0) + (m.sharePct ?? 100));
-  add('map-shares', 'BOM ↔ Cell Routes', 'Dual-source shares not summing to 100%', 'warning', [...shares].filter(([, v]) => Math.abs(v - 100) > 0.5).map(([k, v]) => `${k}: ${v.toFixed(1)}%`));
+  for (const m of state.mappings) {
+    const k = `${m.bomPartId}|${stepOf(m)}`;
+    shares.set(k, (shares.get(k) ?? 0) + (m.sharePct ?? 100));
+  }
+  const multiStep = new Set([...chainsByPart(state.mappings)].filter(([, c]) => c.length > 1).map(([p]) => p));
+  add('map-shares', 'BOM ↔ Cell Routes', 'Dual-source shares not summing to 100% (per routing step)', 'warning', [...shares].filter(([, v]) => Math.abs(v - 100) > 0.5).map(([k, v]) => {
+    const [part, step] = k.split('|');
+    return `${part}${multiStep.has(part) ? ` step ${step}` : ''}: ${v.toFixed(1)}%`;
+  }));
+  const seqIssues: string[] = [];
+  for (const [part, chain] of chainsByPart(state.mappings)) {
+    const steps = chain.map((st) => stepOf(st[0]));
+    steps.forEach((n, i) => { if (n !== i + 1) seqIssues.push(`${part}: routing steps ${steps.join(', ')} — renumber to 1…${steps.length}`); });
+    for (let i = 1; i < chain.length; i++) {
+      const a = primaryOf(chain[i - 1]);
+      const b = primaryOf(chain[i]);
+      if (a.cellId === b.cellId && a.routeId === b.routeId) seqIssues.push(`${part}: step ${i} and ${i + 1} use the same route ${a.cellId}/${a.routeId}`);
+    }
+  }
+  add('map-steps', 'BOM ↔ Cell Routes', 'Multi-hop routing sequence gaps or repeated hops', 'warning', [...new Set(seqIssues)]);
   add('map-orphan-routes', 'BOM ↔ Cell Routes', 'Passport routes with no BOM demand (orphan routes)', 'warning', model.audit.unmappedCellRoutes.map((r) => `${r.cellId}/${r.routeId}`));
 
   // --- Routes ↔ Ops

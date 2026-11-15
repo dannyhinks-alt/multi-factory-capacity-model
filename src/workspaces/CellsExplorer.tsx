@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, ConstraintTag, Meter, Pills, fmtGbp, fmtNum, fmtPct, input, statusTone, td, tdNum, th } from '../components/ui';
 import type { CellMacroBlock } from '../engine/rollup';
-import type { FactoryId } from '../engine/types';
+import type { FactoryId, GateStatus } from '../engine/types';
 import { FACTORIES, FACTORY_NAMES } from '../engine/types';
 import { applyLevers, evaluateWhatIf, solveWhatIf, whatIfContext, type WhatIfLevers, type WhatIfResult } from '../engine/whatif';
 import { useHub } from '../store/HubContext';
@@ -9,7 +9,8 @@ import { DataQualityBadge, PunchList, exportNormalised, useDataQuality } from '.
 import { FlowLeaderboard } from '../components/FlowLeaderboard';
 import { Hint, STATUS } from '../components/ui';
 import { explain } from '../engine/glossary';
-import { QUEUE_RISK_LABEL, sharedWorkCentreStatus, toggleSharedWc, type SharedWcStatus } from '../engine/sharedwc';
+import { QUEUE_RISK_LABEL, sharedWorkCentreStatus, type SharedWcStatus } from '../engine/sharedwc';
+import { applyCellQuickEdit } from '../engine/quickedit';
 import { CONSTRAINT_LABEL, bottleneckVerdict, capacityBars } from '../engine/verdict';
 
 /** 3-bar capacity comparison: Machine vs Competent Labour (≥ 2) vs Tooling Dwell against required demand. */
@@ -51,6 +52,94 @@ function CapacityBars({ cell: c }: { cell: CellMacroBlock }) {
   );
 }
 
+/**
+ * Live “Edit Cell / Route” drawer: shift count, gate status, Shared Work Centre and a route's batch size,
+ * rolled-up setup and bottleneck cycle, applied straight to the Live Baseline. Every apply is audited
+ * (Baseline Governance → `Baseline edit`) and resets an Approved baseline to Draft.
+ */
+function QuickEditDrawer({ cell: c, onClose }: { cell: CellMacroBlock; onClose: () => void }) {
+  const { state, update, notify } = useHub();
+  const p = state.passports.find((x) => x.cellId === c.cellId)!;
+  const [shifts, setShifts] = useState(p.shiftPattern.shiftsPerDay);
+  const [gate, setGate] = useState<GateStatus>(p.gateStatus);
+  const [gateNotes, setGateNotes] = useState(p.gateNotes ?? '');
+  const [shared, setShared] = useState((state.sharedWorkCentres ?? []).includes(c.cellId));
+  const [routeId, setRouteId] = useState(c.routes[0]?.routeId ?? '');
+  const r = c.routes.find((x) => x.routeId === routeId);
+  const [batch, setBatch] = useState(String(r?.batchSize ?? ''));
+  const [setup, setSetup] = useState(String(r ? Math.round(r.rolledSetupMin * 100) / 100 : ''));
+  const [cycle, setCycle] = useState(String(r ? Math.round(r.bottleneckCycleMin * 1000) / 1000 : ''));
+  const pickRoute = (id: string) => {
+    const nr = c.routes.find((x) => x.routeId === id);
+    setRouteId(id);
+    setBatch(String(nr?.batchSize ?? ''));
+    setSetup(String(nr ? Math.round(nr.rolledSetupMin * 100) / 100 : ''));
+    setCycle(String(nr ? Math.round(nr.bottleneckCycleMin * 1000) / 1000 : ''));
+  };
+  const num = (v: string) => (v.trim() === '' || !Number.isFinite(+v) ? undefined : +v);
+  const apply = () => {
+    const edit = {
+      shiftsPerDay: shifts,
+      gateStatus: gate,
+      gateNotes: gateNotes.trim() || undefined,
+      sharedWorkCentre: shared,
+      // Only fields the engineer changed are sent, so untouched routes are never re-scaled by rounding.
+      route: r ? {
+        routeId,
+        batchSize: batch !== String(r.batchSize) ? num(batch) : undefined,
+        setupMin: setup !== String(Math.round(r.rolledSetupMin * 100) / 100) ? num(setup) : undefined,
+        cycleMin: cycle !== String(Math.round(r.bottleneckCycleMin * 1000) / 1000) ? num(cycle) : undefined,
+      } : undefined,
+    };
+    let preview: string[];
+    try {
+      preview = applyCellQuickEdit(state, c.cellId, edit).changes;
+    } catch (e) {
+      notify((e as Error).message, 'critical');
+      return;
+    }
+    if (!preview.length) return notify('No changes to apply', 'info');
+    update((s) => applyCellQuickEdit(s, c.cellId, edit).state);
+    notify(`${c.cellId}: ${preview.join('; ')} — logged in Baseline Governance; baseline set to Draft`, 'good');
+    onClose();
+  };
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3" role="region" aria-label={`Edit cell ${c.cellId}`}>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-xs font-semibold text-slate-800">✎ Edit Cell / Route — live model</div>
+        <span className="text-[11px] text-slate-500">Applies to the Live Baseline · audited · resets Approved → Draft</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <fieldset className="space-y-2 rounded border border-slate-200 bg-white p-2 text-xs">
+          <legend className="px-1 text-[11px] font-semibold text-slate-600">Cell {c.cellId}</legend>
+          <label className="flex items-center justify-between gap-2">Shifts per day
+            <select className={input} aria-label="Shifts per day" value={shifts} onChange={(e) => setShifts(+e.target.value)}>{[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}</select>
+          </label>
+          <label className="flex items-center justify-between gap-2">Gate status
+            <select className={input} aria-label="Gate status" value={gate} onChange={(e) => setGate(e.target.value as GateStatus)}>{(['PASSED', 'CONDITIONAL', 'BLOCKED'] as GateStatus[]).map((g) => <option key={g}>{g}</option>)}</select>
+          </label>
+          {gate !== 'PASSED' && <input className={`${input} w-full`} aria-label="Gate notes" placeholder="Gate notes (reason)" value={gateNotes} onChange={(e) => setGateNotes(e.target.value)} />}
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Shared Work Centre" checked={shared} onChange={(e) => setShared(e.target.checked)} /> Shared Work Centre</label>
+        </fieldset>
+        <fieldset className="space-y-2 rounded border border-slate-200 bg-white p-2 text-xs">
+          <legend className="px-1 text-[11px] font-semibold text-slate-600">Route</legend>
+          <select className={`${input} w-full`} aria-label="Route" value={routeId} onChange={(e) => pickRoute(e.target.value)}>{c.routes.map((x) => <option key={x.routeId} value={x.routeId}>{x.routeId} · {x.description}</option>)}</select>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="space-y-0.5"><div className="text-[11px] text-slate-500">Batch size</div><input type="number" min={1} className={`${input} w-full text-right`} aria-label="Batch size" value={batch} onChange={(e) => setBatch(e.target.value)} /></label>
+            <label className="space-y-0.5"><div className="text-[11px] text-slate-500">Setup min (rolled-up)</div><input type="number" step="any" className={`${input} w-full text-right`} aria-label="Setup minutes" value={setup} onChange={(e) => setSetup(e.target.value)} /></label>
+            <label className="space-y-0.5"><div className="text-[11px] text-slate-500">Cycle min (bottleneck)</div><input type="number" step="any" className={`${input} w-full text-right`} aria-label="Cycle minutes" value={cycle} onChange={(e) => setCycle(e.target.value)} /></label>
+          </div>
+          <p className="text-[10px] text-slate-500">Setup and cycle targets re-scale every micro-op proportionally, so the Micro-Route Drill-Down and the folded Macro-Block stay consistent.</p>
+        </fieldset>
+      </div>
+      <div className="mt-2 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" onClick={apply}>Apply to live model</Button>
+      </div>
+    </div>
+  );
+}
+
 /** Shared Work Centre designation toggle + queue-contention risk badge. */
 function SharedWcPanel({ cellId, status }: { cellId: string; status?: SharedWcStatus }) {
   const { state, update } = useHub();
@@ -58,7 +147,7 @@ function SharedWcPanel({ cellId, status }: { cellId: string; status?: SharedWcSt
   return (
     <div className="flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-xs">
       <label className="flex items-center gap-1.5 font-medium text-slate-800" title="A Shared Work Centre is fed by several cells (paint, anodise, CMM, heat treatment…)">
-        <input type="checkbox" checked={on} onChange={(e) => update((s) => ({ ...s, sharedWorkCentres: toggleSharedWc(s.sharedWorkCentres, cellId, e.target.checked) }), `${cellId} ${e.target.checked ? 'designated' : 'removed as'} Shared Work Centre`)} />
+        <input type="checkbox" checked={on} onChange={(e) => { const v = e.target.checked; update((s) => applyCellQuickEdit(s, cellId, { sharedWorkCentre: v }).state); }} />
         Shared Work Centre
       </label>
       {on && status && (status.risk
@@ -206,11 +295,16 @@ function CellRow({ cell: c, swc, expanded, onToggle }: { cell: CellMacroBlock; s
 function CellDetail({ cell: c, swc }: { cell: CellMacroBlock; swc?: SharedWcStatus }) {
   const { state } = useHub();
   const [view, setView] = useState<'macro' | 'micro'>('macro');
+  const [editing, setEditing] = useState(false);
   const passport = state.passports.find((p) => p.cellId === c.cellId)!;
   return (
     <div className="space-y-3 px-4 pb-4">
       <CapacityBars cell={c} />
-      <SharedWcPanel cellId={c.cellId} status={swc} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1"><SharedWcPanel cellId={c.cellId} status={swc} /></div>
+        <Button variant={editing ? 'ghost' : 'secondary'} onClick={() => setEditing((v) => !v)} title="Edit shift count, gate status, Shared Work Centre and route batch / setup / cycle on the live model">✎ Edit Cell / Route</Button>
+      </div>
+      {editing && <QuickEditDrawer key={`${c.cellId}-${passport.shiftPattern.shiftsPerDay}-${passport.gateStatus}`} cell={c} onClose={() => setEditing(false)} />}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
         {[
           ['Rolled-up setup', `${fmtNum(c.rolledSetupMin, 1)} min`],

@@ -26,7 +26,9 @@ export interface ExplodedLine {
   /** Cumulative yield from this line up to its L1 top Assembly (product of 1 − scrap). */
   cumYieldPct: number;
   ownLeadTimeDays: number;
-  /** Cumulative lead time: own + longest child chain. */
+  /** Cross-factory transfer lead time (days) of this line: inter-plant hops within its routing chain + hand-over to its parent. */
+  transitLeadTimeDays: number;
+  /** Cumulative lead time: own + transit + longest child chain. */
   cumLeadTimeDays: number;
   onCriticalPath: boolean;
   childIds: string[];
@@ -88,10 +90,11 @@ export function grossUp(net: number, scrapPct: number): number {
  * - L1 net demand comes from the Master Schedule (quarter buckets incl. launch-rate overrides).
  * - Child net = parent gross × qty per; child gross = net grossed up for the child's own scrap.
  * - Cumulative yield multiplies (1 − scrap) from the line up through every ancestor.
- * - Cumulative lead time = own lead time + the longest child chain; the critical path follows the max.
+ * - Cumulative lead time = own lead time + cross-factory transit (optional `transitDays` callback: inter-plant
+ *   hops in the routing chain and the hand-over to the parent) + the longest child chain; the critical path follows the max.
  * - Shared L5 raw materials and bought-out items are rolled up by part ID across every parent.
  */
-export function explodeBom(bom: BomLine[], schedule: ScheduleLine[]): BomExplosion {
+export function explodeBom(bom: BomLine[], schedule: ScheduleLine[], transitDays?: (line: BomLine, parent: BomLine | null) => number): BomExplosion {
   const byLineId = new Map<string, ExplodedLine>();
   const children = new Map<string | null, BomLine[]>();
   for (const l of bom) {
@@ -100,6 +103,7 @@ export function explodeBom(bom: BomLine[], schedule: ScheduleLine[]): BomExplosi
     children.get(key)!.push(l);
   }
   const schedByPart = new Map(schedule.map((s) => [s.partId, s]));
+  const bomById = new Map(bom.map((b) => [b.lineId, b]));
   const lines: ExplodedLine[] = [];
   const orphanLines: string[] = [];
   const lineIds = new Set(bom.map((b) => b.lineId));
@@ -134,6 +138,7 @@ export function explodeBom(bom: BomLine[], schedule: ScheduleLine[]): BomExplosi
       grossByQuarter: grossQ,
       cumYieldPct: cumYield * 100,
       ownLeadTimeDays: l.leadTimeDays,
+      transitLeadTimeDays: 0,
       cumLeadTimeDays: l.leadTimeDays,
       onCriticalPath: false,
       childIds: [],
@@ -149,7 +154,9 @@ export function explodeBom(bom: BomLine[], schedule: ScheduleLine[]): BomExplosi
       const ck = visit(k, ex, depth + 1);
       maxChild = Math.max(maxChild, ck.cumLeadTimeDays);
     }
-    ex.cumLeadTimeDays = l.leadTimeDays + maxChild;
+    const parentLine = l.parentLineId ? bomById.get(l.parentLineId) ?? null : null;
+    ex.transitLeadTimeDays = transitDays ? Math.max(0, transitDays(l, parentLine)) : 0;
+    ex.cumLeadTimeDays = l.leadTimeDays + ex.transitLeadTimeDays + maxChild;
     return ex;
   };
 

@@ -10,7 +10,7 @@
 import { toCsv } from './csv';
 import { recordAudit } from './governance';
 import { fuzzyMapFields, toNum, type FieldSpec } from './importer';
-import { routeKey, tokenSimilarity } from './mapping';
+import { chainsByPart, primaryOf, routeKey, tokenSimilarity } from './mapping';
 import { applyMacroOverrides, type HubModel } from './model';
 import type { DriftClass, DriftJustification, FactoryId, FixedProcessBaseline, FixedProcessStep, HubState } from './types';
 
@@ -133,10 +133,21 @@ export function reconcile(state: HubState, steps: FixedProcessStep[] = state.fix
   const seen = new Set<string>();
   const mappedParts = new Set<string>();
   const coveredParts = new Set<string>();
+  // Multi-hop parts: the Fixed Process spans every step, so each hop is checked against the steps it
+  // performs; a document step missing from the whole chain is reported once, at Step 1.
+  const chains = chainsByPart(state.mappings);
   for (const m of state.mappings) {
     mappedParts.add(m.bomPartId);
     const fixed = byPart.get(m.bomPartId);
     if (!fixed) continue;
+    const chain = chains.get(m.bomPartId) ?? [[m]];
+    const stepIdx = Math.max(0, chain.findIndex((st) => st.includes(m)));
+    const otherOps = chain
+      .filter((_st, i) => i !== stepIdx)
+      .flatMap((st) => {
+        const pm = primaryOf(st);
+        return passports.find((x) => x.cellId === pm.cellId)?.routes.find((x) => x.routeId === pm.routeId)?.ops ?? [];
+      });
     const rk = `${routeKey(m.cellId, m.routeId)}|${m.bomPartId}`;
     if (seen.has(rk)) continue;
     seen.add(rk);
@@ -153,6 +164,8 @@ export function reconcile(state: HubState, steps: FixedProcessStep[] = state.fix
     for (const f of [...fixed].sort((a, b) => a.opNo - b.opNo)) {
       let op = r.ops.find((o) => o.opNo === f.opNo && !matched.has(o.opNo));
       if (!op) op = r.ops.find((o) => !matched.has(o.opNo) && !fixed.some((x) => x.opNo === o.opNo) && tokenSimilarity(o.description, f.opDescription) >= 0.6);
+      if (!op && otherOps.some((o) => o.opNo === f.opNo || tokenSimilarity(o.description, f.opDescription) >= 0.6)) continue; // performed at another hop
+      if (!op && stepIdx > 0) continue; // missing from the whole chain — reported at Step 1
       if (!op) {
         push({
           cls: f.mandatory ? 'COMPLIANCE DEVIATION' : 'MATURING DRIFT',

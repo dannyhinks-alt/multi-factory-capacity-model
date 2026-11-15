@@ -8,7 +8,7 @@
 import { resolveSchedule } from './bom';
 import { toCsv } from './csv';
 import { computeModel, factoryKpis, type HubModel } from './model';
-import { routeKey } from './mapping';
+import { routeKey, stepOf } from './mapping';
 import type { CellMacroBlock, RouteMacroBlock } from './rollup';
 import { activeFactoryList, SERVICE_KEYS, SERVICE_LABELS } from './settings';
 import type { CellPassport, ConstraintKind, CostAdjustment, FactoryId, HubState, MacroOverride, MicroOp, Quarter, RouteMapping, ServiceVector, SignOffStatus } from './types';
@@ -313,6 +313,21 @@ export function reassignAsset(s: HubState, fromCell: string, assetId: string, qt
   return `Reassigned ${n}× ${assetId} (${c.category}) from ${fromCell} to ${toCell} as ${target}`;
 }
 
+/** Inter-plant lanes that opened, closed or changed cost between two models. */
+function laneCauses(bm: HubModel, sm: HubModel): string[] {
+  const key = (l: { from: string; to: string }) => `${l.from} → ${l.to}`;
+  const before = new Map(bm.flows.lanes.map((l) => [key(l), l]));
+  const after = new Map(sm.flows.lanes.map((l) => [key(l), l]));
+  const out: string[] = [];
+  for (const [k, l] of after) {
+    const b = before.get(k);
+    if (!b) out.push(`New milk-run lane ${k}: ${Math.round(l.trucksPerYear).toLocaleString('en-GB')} trucks/yr, £${Math.round(l.costGbp).toLocaleString('en-GB')}/yr`);
+    else if (Math.abs(l.costGbp - b.costGbp) > 1) out.push(`Lane ${k}: £${Math.round(b.costGbp).toLocaleString('en-GB')} → £${Math.round(l.costGbp).toLocaleString('en-GB')}/yr`);
+  }
+  for (const [k, b] of before) if (!after.has(k)) out.push(`Lane ${k} no longer needed (saves £${Math.round(b.costGbp).toLocaleString('en-GB')}/yr)`);
+  return out.slice(0, 3);
+}
+
 // ---------------------------------------------------------------- 3 · Route vs Route (micro-op & macro-block variants)
 
 const route = (s: HubState, cellId: string, routeId: string) => {
@@ -414,21 +429,23 @@ export function setMacroOverride(s: HubState, cellId: string, routeId: string, o
  * goes to the alternate route, existing mappings are scaled to the remaining share. pct = 0 removes it;
  * pct = 100 moves the part entirely.
  */
-export function setRouteSplit(s: HubState, bomPartId: string, alt: { cellId: string; routeId: string }, pct: number): string {
+export function setRouteSplit(s: HubState, bomPartId: string, alt: { cellId: string; routeId: string }, pct: number, seq = 1): string {
   const p = passport(s, alt.cellId);
   const r = p.routes.find((x) => x.routeId === alt.routeId);
   if (!r) throw new Error(`Route ${alt.routeId} not in ${alt.cellId}`);
   const share = Math.min(100, Math.max(0, pct));
-  const others = s.mappings.filter((m) => m.bomPartId === bomPartId && !(m.cellId === alt.cellId && m.routeId === alt.routeId));
+  // Dual-source shares are parallel within one routing step; other sequential steps are left untouched.
+  const inStep = (m: RouteMapping) => m.bomPartId === bomPartId && stepOf(m) === seq;
+  const others = s.mappings.filter((m) => inStep(m) && !(m.cellId === alt.cellId && m.routeId === alt.routeId));
   const otherTotal = others.reduce((t, m) => t + (m.sharePct ?? 100), 0);
-  s.mappings = s.mappings.filter((m) => m.bomPartId !== bomPartId);
+  s.mappings = s.mappings.filter((m) => !inStep(m));
   for (const m of others) {
     const w = otherTotal > 0 ? (m.sharePct ?? 100) / otherTotal : 1 / others.length;
     const ns = (100 - share) * w;
     if (ns > 0.01) s.mappings.push({ ...m, sharePct: ns });
   }
-  if (share > 0) s.mappings.push({ bomPartId, factory: p.factory, cellId: alt.cellId, routeId: alt.routeId, variantId: r.variantId, source: 'scenario', updatedAt: nowIso(), sharePct: share });
-  return `${bomPartId}: ${share}% → ${alt.cellId}/${alt.routeId}, ${100 - share}% on existing route(s)`;
+  if (share > 0) s.mappings.push({ bomPartId, factory: p.factory, cellId: alt.cellId, routeId: alt.routeId, variantId: r.variantId, source: 'scenario', updatedAt: nowIso(), sharePct: share, ...(seq > 1 ? { seq } : {}) });
+  return `${bomPartId}${seq > 1 ? ` step ${seq}` : ''}: ${share}% → ${alt.cellId}/${alt.routeId}, ${100 - share}% on existing route(s)`;
 }
 
 /** Make-vs-Buy: subcontract a share of a BOM part at a bought-in piece-part price. */
@@ -650,6 +667,9 @@ export interface ScenarioMetrics {
   crossFactoryPallets: number;
   interPlantKmPerYear: number;
   handlingHoursPerYear: number;
+  /** Inter-plant logistics £/yr (milk-run truck movements) and truck movements per year. */
+  interPlantLogisticsGbp: number;
+  truckMovesPerYear: number;
   /** Shared Work Centres tagged Queue Contention Risk. */
   sharedWcRisks: number;
   activeFactories: FactoryId[];
@@ -700,7 +720,8 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
   const annualOpexAdjGbp = adj.reduce((t, a) => t + a.opexGbpPerYear, 0);
   const installedCapexGbp = k.totalCapexGbp;
   const annualDepreciationGbp = (installedCapexGbp + adjustmentsCapexGbp) / Math.max(1, state.settings.depreciationYears);
-  const annualCost = annualLabourGbp + annualSubcontractGbp + annualOpexAdjGbp + annualDepreciationGbp;
+  const interPlantLogisticsGbp = model.flows.totals.logisticsCostGbp;
+  const annualCost = annualLabourGbp + annualSubcontractGbp + annualOpexAdjGbp + annualDepreciationGbp + interPlantLogisticsGbp;
   let footprintM2 = 0;
   let floorAreaM2 = 0;
   const spaceOverruns: FactoryId[] = [];
@@ -758,6 +779,8 @@ export function scenarioMetrics(state: HubState, model: HubModel = computeModel(
     crossFactoryPallets: model.flows.totals.crossFactoryPallets,
     interPlantKmPerYear: model.flows.totals.interPlantKmPerYear,
     handlingHoursPerYear: model.flows.totals.handlingHoursPerYear,
+    interPlantLogisticsGbp,
+    truckMovesPerYear: model.flows.totals.truckMovesPerYear,
     sharedWcRisks: sharedWorkCentreStatus(state, model).filter((x) => x.risk && model.activeFactories.includes(x.factory)).length,
     activeFactories: model.activeFactories,
     limitingCells: model.cells
@@ -877,6 +900,7 @@ export const MATRIX_ROWS: MatrixRow[] = [
   { key: 'crossPallets', label: 'Cross-factory transfers', unit: 'pallets/yr', better: 'lower', get: (e) => e.metrics.crossFactoryPallets },
   { key: 'interPlantKm', label: 'Inter-plant distance', unit: 'km/yr', better: 'lower', get: (e) => e.metrics.interPlantKmPerYear },
   { key: 'handling', label: 'Material handling', unit: 'h/yr', better: 'lower', get: (e) => e.metrics.handlingHoursPerYear },
+  { key: 'logisticsCost', label: 'Inter-plant logistics cost (£/yr)', unit: '£', better: 'lower', get: (e) => e.metrics.interPlantLogisticsGbp },
   { key: 'sharedWcRisk', label: 'Shared Work Centre queue risks', unit: 'count', better: 'lower', get: (e) => e.metrics.sharedWcRisks },
   { key: 'oee', label: 'OEE', unit: '%', better: 'higher', get: (e) => e.metrics.oeePct },
   { key: 'teep', label: 'TEEP', unit: '%', better: 'higher', get: (e) => e.metrics.teepPct },
@@ -1163,7 +1187,8 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
   // Material flow & spaghetti chain
   const dKm = sc.metrics.intraKmPerYear - base.metrics.intraKmPerYear;
   const dRoad = sc.metrics.interPlantKmPerYear - base.metrics.interPlantKmPerYear;
-  if (Math.abs(dKm) > Math.max(5, base.metrics.intraKmPerYear * 0.03) || Math.abs(dRoad) > 1) {
+  const dLog = sc.metrics.interPlantLogisticsGbp - base.metrics.interPlantLogisticsGbp;
+  if (Math.abs(dKm) > Math.max(5, base.metrics.intraKmPerYear * 0.03) || Math.abs(dRoad) > 1 || Math.abs(dLog) > 1) {
     const bv = new Map(bm.flows.vectors.map((v) => [`${v.fromId}>${v.toId}`, 0]));
     for (const v of bm.flows.vectors) bv.set(`${v.fromId}>${v.toId}`, (bv.get(`${v.fromId}>${v.toId}`) ?? 0) + v.internalKmPerYear + v.roadKmPerYear);
     const sv = new Map<string, number>();
@@ -1183,6 +1208,8 @@ export function diagnose(base: ScenarioEvaluation, sc: ScenarioEvaluation): Effe
         ...movedCells.map((c) => `${c.cellId} relocated ${bm.cellById.get(c.cellId)!.factory} → ${c.factory}: its feeders now cross the plant boundary`),
         ...added.map((c) => `${c.cellId} added in ${c.factory} — new dual-source corridors`),
         `Cross-factory transfers ${Math.round(base.metrics.crossFactoryPallets).toLocaleString('en-GB')} → ${Math.round(sc.metrics.crossFactoryPallets).toLocaleString('en-GB')} pallets/yr`,
+        `Inter-plant logistics £${Math.round(base.metrics.interPlantLogisticsGbp).toLocaleString('en-GB')} → £${Math.round(sc.metrics.interPlantLogisticsGbp).toLocaleString('en-GB')}/yr (${Math.round(base.metrics.truckMovesPerYear).toLocaleString('en-GB')} → ${Math.round(sc.metrics.truckMovesPerYear).toLocaleString('en-GB')} truck movements)`,
+        ...laneCauses(bm, sm),
         ...corridorCauses,
       ].slice(0, 8),
     });

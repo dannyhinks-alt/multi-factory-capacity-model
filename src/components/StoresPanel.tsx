@@ -110,11 +110,11 @@ export function StoresPanel() {
                     <td className={td}>{i.factory}</td>
                     <td className={td}><span className="font-mono text-[11px]">{i.partId}</span><div className="text-[11px] text-slate-500">{i.description}</div></td>
                     <td className={`${td} text-[11px]`}>
-                      {b ? <><span className="font-mono">{b.producerCellId} → {b.consumerCellId}</span>{b.crossFactory && <Badge tone="info">{b.producerFactory} → {b.factory}</Badge>}</> : i.location}
+                      {b ? <><span className="font-mono">{b.producerCellId} → {b.consumerCellId}</span>{b.crossFactory && <Badge tone="info" title={`Cross-factory: +${b.transitCoverUnits.toFixed(0)} units transit & milk-run cover`}>{b.producerFactory} → {b.factory}</Badge>}{b.hopFrom && <Badge tone="neutral" title="Sequential multi-hop buffer between routing steps of the same part">Step {b.hopFrom}→{b.hopFrom + 1}</Badge>}</> : i.location}
                     </td>
                     <td className={tdNum}>{fmtNum(i.dailyDemand, 1)}</td>
-                    <td className={tdNum} title={b ? `batch ${b.cycleUnits} + setup cover ${b.setupCoverUnits.toFixed(1)} + safety ${b.safetyUnits.toFixed(1)} → recommended ${b.recommendedUnits}; average ${b.averageWipUnits.toFixed(1)}` : ''}>
-                      {b ? <><b>{b.recommendedUnits}</b> <span className="text-[10px] text-slate-500">({b.cycleUnits}+{b.setupCoverUnits.toFixed(1)}+{b.safetyUnits.toFixed(1)})</span></> : fmtNum(i.stockUnits)}
+                    <td className={tdNum} title={b ? `batch ${b.cycleUnits} + setup cover ${b.setupCoverUnits.toFixed(1)} + safety ${b.safetyUnits.toFixed(1)}${b.transitCoverUnits ? ` + transit & milk-run cover ${b.transitCoverUnits.toFixed(1)}` : ''} → recommended ${b.recommendedUnits}; average ${b.averageWipUnits.toFixed(1)}` : ''}>
+                      {b ? <><b>{b.recommendedUnits}</b> <span className="text-[10px] text-slate-500">({b.cycleUnits}+{b.setupCoverUnits.toFixed(1)}+{b.safetyUnits.toFixed(1)}{b.transitCoverUnits ? `+${b.transitCoverUnits.toFixed(1)} transit` : ''})</span></> : fmtNum(i.stockUnits)}
                     </td>
                     <td className={tdNum}>{fmtNum(i.daysCover, 1)}</td>
                     <td className={tdNum}>{i.locations}</td>

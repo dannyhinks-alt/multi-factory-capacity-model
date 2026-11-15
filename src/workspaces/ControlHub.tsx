@@ -41,7 +41,7 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
         <div className="text-xs text-slate-500">{scope === 'All' ? `${k.cells} cells across ${model.activeFactories.join(', ')}` : FACTORY_NAMES[scope]} · {fmtNum(k.annualOutput)} top Assemblies / yr scheduled</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <Stat label="Total CapEx" value={fmtGbp(k.totalCapexGbp)} sub={`Cells ${fmtGbp(k.cellCapexGbp)} + shared ${fmtGbp(k.sharedPlantCapexGbp)}`} hint={explain('totalCapex')} />
         <Stat label="Footprint" value={`${fmtNum(k.totalFootprintM2)} m²`} sub={`Cells ${fmtNum(k.factoryFootprintM2)} (incl. circulation) + stores ${fmtNum(k.storesFootprintM2)} m²`} hint={explain('footprint')} />
         <Stat label="Stores & WIP" value={fmtGbp(k.workingCapitalGbp)} sub={`Working capital · ${fmtNum(k.storesFootprintM2)} m² stores & buffers`} hint={explain('storesWip')} />
@@ -51,6 +51,7 @@ export default function ControlHub({ navigate }: { navigate: (t: NavTarget) => v
         <Stat label="PCE" value={fmtPct(k.pce.pct, 1)} sub="VA ÷ (VA+NVA+ENVA)" hint={explain('pce')} />
         <Stat label="Bottleneck cells" value={k.bottlenecks.length} tone={k.bottlenecks.length ? 'critical' : 'good'} sub={`${k.nearLimit.length} near limit (≥ ${s.nearLimitPct}%)`} hint={explain('bottlenecks')} />
         <Stat label="Blocked cells" value={k.blocked.length} tone={k.blocked.length ? 'critical' : 'good'} sub={`${k.overUtility.length} over-utility`} hint={explain('blocked')} />
+        <Stat label="Inter-plant logistics" value={`${fmtGbp(k.interPlantLogisticsGbp)}/yr`} sub={scope === 'All' ? `${fmtNum(model.flows.totals.truckMovesPerYear)} milk-run truck movements · ${s.interPlantTransitDays} day transit` : `trucks despatched from ${scope}`} hint={explain('logistics')} />
         <Stat label="Material handling" value={`${fmtNum(scope === 'All' ? model.flows.totals.handlingHoursPerYear : model.flows.byFactory.find((f) => f.factory === scope)!.handlingHoursPerYear)} h/yr`} sub={scope === 'All' ? `${fmtNum(model.flows.totals.intraKmPerYear)} km/yr internal · ${fmtNum(model.flows.totals.crossFactoryPallets)} cross-factory pallets` : `${fmtNum(model.flows.byFactory.find((f) => f.factory === scope)!.intraKmPerYear)} km/yr internal travel`} hint={explain('handling')} />
       </div>
       <FlowLeaderboard scope={scope} navigate={navigate} />
